@@ -1,3 +1,4 @@
+import { Shader } from "@/hooks/engine/Shader";
 import { ExpoWebGLRenderingContext, GLView } from "expo-gl";
 import React, { useEffect, useRef } from "react";
 import { View } from "react-native";
@@ -5,32 +6,30 @@ import { View } from "react-native";
 export default function App() {
   const animationRef = useRef<number | null>(null);
 
-  function compileShader(
+  async function createProgram(
     gl: ExpoWebGLRenderingContext,
-    type: number,
-    source: string
+    vertex_shader: Shader,
+    fragment_shader: Shader
   ) {
-    const shader = gl.createShader(type)!;
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
+    let compiled_vertex: WebGLShader | null = null;
+    let compiled_fragment: WebGLShader | null = null;
 
-    const success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
-    if (!success) {
-      throw new Error(
-        gl.getShaderInfoLog(shader) || "Shader compilation failed"
-      );
-    }
-    return shader;
-  }
+    const vertex_shader_compilation = vertex_shader
+      .compile()
+      .then((c) => (compiled_vertex = c));
+    const fragment_shader_compilation = fragment_shader
+      .compile()
+      .then((c) => (compiled_fragment = c));
 
-  function createProgram(
-    gl: ExpoWebGLRenderingContext,
-    vertexShader: any,
-    fragmentShader: any
-  ) {
+    await Promise.all([vertex_shader_compilation, fragment_shader_compilation]);
+
     const program = gl.createProgram()!;
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
+    if (compiled_vertex == null)
+      throw Error("Vertex shader compilation failed");
+    gl.attachShader(program, compiled_vertex);
+    if (compiled_fragment == null)
+      throw Error("Fragment shader compilation failed");
+    gl.attachShader(program, compiled_fragment);
     gl.linkProgram(program);
 
     const success = gl.getProgramParameter(program, gl.LINK_STATUS);
@@ -39,42 +38,15 @@ export default function App() {
         gl.getProgramInfoLog(program) || "Program linking failed"
       );
     }
+
     return program;
   }
 
   async function onContextCreate(gl: ExpoWebGLRenderingContext) {
-    const vertexShaderSource = `
-      attribute vec2 a_position;
-      uniform float u_angle;
-      void main() {
-        float cosA = cos(u_angle);
-        float sinA = sin(u_angle);
-        gl_Position = vec4(
-          a_position.x * cosA - a_position.y * sinA,
-          a_position.x * sinA + a_position.y * cosA,
-          0.0, 1.0
-        );
-      }
-    `;
+    const vertex_shader = new Shader(gl, "test", gl.VERTEX_SHADER);
+    const fragment_shader = new Shader(gl, "test", gl.FRAGMENT_SHADER);
 
-    const fragmentShaderSource = `
-      precision mediump float;
-      void main() {
-        gl_FragColor = vec4(0.0, 1.0, 1.0, 1.0); // Cyan
-      }
-    `;
-
-    const vertexShader = compileShader(
-      gl,
-      gl.VERTEX_SHADER,
-      vertexShaderSource
-    );
-    const fragmentShader = compileShader(
-      gl,
-      gl.FRAGMENT_SHADER,
-      fragmentShaderSource
-    );
-    const program = createProgram(gl, vertexShader, fragmentShader);
+    const program = await createProgram(gl, vertex_shader, fragment_shader);
 
     gl.useProgram(program);
 
