@@ -1,20 +1,57 @@
-import { promises as fsPromises } from "fs";
-import { join } from "path";
-import getAssetsPath from "./get-asset-dir";
+import { assetContents } from "@/generated/assetMap"; // adjust relative path
 
-//thanks to: https://bobbyhadz.com/blog/typescript-read-file-contents#:~:text=Use%20the%20readFileSync%28%29%20method%20to%20read%20a%20file%27s,code%20for%20this%20article%20is%20available%20on%20GitHub
-export default async function asyncReadFile(filename: string) {
+export default function readFile(filename: string): string {
+  // filename should match the key in the generated map, e.g. "shaders/test.glsl.frag"
+  const content = assetContents[filename];
+  if (content === undefined) {
+    throw new Error(`Asset not found in embedded map: ${filename}`);
+  }
+  return content;
+  /*
+  console.log(filename);
+  const moduleId = require("../../assets/loaded/shaders/test.glsl.frag")// assetMap[filename];
+  if (!moduleId) throw new Error(`Asset not found: ${filename}`);
+
+  const asset = Asset.fromModule(require("../../assets/loaded/shaders/test.glsl.frag"));
+  await asset.downloadAsync();
+
+  /*const file = new File(asset.localUri!);
+  return await file.text();
+  /*const asset_file = Paths.join(getAssetsPath(), filename);
+  console.log(asset_file);
+  const [assets, error] = useAssets([
+    require(asset_file),
+  ]);
+
+  if(!assets)
+    throw new Error(`Couldn't find asset ${asset_file}. ${error}`)
+  
+  const asset = assets[0]
+
+  //const asset = Asset.fromModule(require(asset_file));
+
+  await asset.downloadAsync();
+
+  if (!asset.localUri) {
+    throw new Error(`Asset ${filename} failed to download or does not have a localUri.`);
+  }
+
+  const file = new File(asset.localUri);
+
+  const text = await file.text();
+
+  return text;
+  /*
+  const f = new File(Paths.join(getAssetsPath(), filename))
+  console.log(Paths.join(getAssetsPath(), filename))
   try {
-    const result = await fsPromises.readFile(
-      join(getAssetsPath(), filename),
-      "utf-8"
-    );
+    const result = await f.textSync();
 
     console.log(result);
-
+    Assets.at
     return result;
   } catch (err) {
     console.log(err);
-    throw new Error("Couldn't load shaders.");
-  }
+    throw new Error("Couldn't read file")
+  }*/
 }

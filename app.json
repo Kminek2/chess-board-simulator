@@ -1,5 +1,8 @@
 {
   "expo": {
+    "assetBundlePatterns": [
+      "Assets/shaders/*"
+    ],
     "name": "shopifast",
     "slug": "shopifast",
     "version": "1.0.0",
@@ -37,6 +40,12 @@
           "dark": {
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      [
+        "expo-asset",
+        {
+          "assets": ["assets/loaded"]
         }
       ]
     ],

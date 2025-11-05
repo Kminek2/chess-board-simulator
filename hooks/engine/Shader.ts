@@ -1,5 +1,5 @@
 import { ExpoWebGLRenderingContext } from "expo-gl";
-import { join } from "path";
+import {Paths} from "expo-file-system"
 import readFile from "../helpers/read-file";
 
 export class Shader {
@@ -24,11 +24,9 @@ export class Shader {
     this._shader_path = shader_path;
   }
   public async compile(): Promise<WebGLShader> {
-    await readFile(
+    this._shader_source = readFile(
       this._fullShaderPath(this._shader_path, this._getShaderExtension())
-    ).then((v: string) => {
-      this._shader_source = v;
-    });
+    );
 
     const shader = this._compileShader(
       this._gl,
@@ -70,7 +68,7 @@ export class Shader {
 
   private _fullShaderPath(path: string, ending?: string): string {
     return ending
-      ? join(this._SHADER_FOLDER, path + ".glsl" + ending)
-      : join(this._SHADER_FOLDER, path + ".glsl");
+      ? Paths.join(this._SHADER_FOLDER, path + ".glsl" + ending)
+      : Paths.join(this._SHADER_FOLDER, path + ".glsl");
   }
 }
