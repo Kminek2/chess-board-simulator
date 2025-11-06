@@ -11,22 +11,16 @@ export default function App() {
     vertex_shader: Shader,
     fragment_shader: Shader
   ) {
-    let compiled_vertex: WebGLShader | null = null;
-    let compiled_fragment: WebGLShader | null = null;
-
-    const vertex_shader_compilation = vertex_shader
-      .compile()
-      .then((c) => (compiled_vertex = c));
-    const fragment_shader_compilation = fragment_shader
-      .compile()
-      .then((c) => (compiled_fragment = c));
-
-    await Promise.all([vertex_shader_compilation, fragment_shader_compilation]);
-
+    const vertex_shader_compilation = vertex_shader.compile();
+    const fragment_shader_compilation = fragment_shader.compile();
     const program = gl.createProgram()!;
+
+    const compiled_vertex = await vertex_shader_compilation;
     if (compiled_vertex == null)
       throw Error("Vertex shader compilation failed");
     gl.attachShader(program, compiled_vertex);
+
+    const compiled_fragment = await fragment_shader_compilation;
     if (compiled_fragment == null)
       throw Error("Fragment shader compilation failed");
     gl.attachShader(program, compiled_fragment);
