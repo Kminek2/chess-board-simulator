@@ -5,7 +5,7 @@
 
 export const assetContents: Record<string, string> = {
   "shaders/test.glsl.frag": "precision mediump float;\r\n      void main() {\r\n        gl_FragColor = vec4(0.0, 1.0, 1.0, 1.0); // Cyan\r\n      }",
-  "shaders/test.glsl.vert": "attribute vec2 a_position;\r\n      uniform float u_angle;\r\n      void main() {\r\n        float cosA = cos(u_angle);\r\n        float sinA = sin(u_angle);\r\n        gl_Position = vec4(\r\n          a_position.x * cosA - a_position.y * sinA,\r\n          a_position.x * sinA + a_position.y * cosA,\r\n          0.0, 1.0\r\n        );\r\n      }",
+  "shaders/test.glsl.vert": "attribute vec3 a_position;\r\n      uniform float u_angle;\r\n      void main() {\r\n        float cosA = cos(u_angle);\r\n        float sinA = sin(u_angle);\r\n        gl_Position = vec4(\r\n          a_position.x * cosA - a_position.y * sinA,\r\n          a_position.x * sinA + a_position.y * cosA,\r\n          a_position.z, 1.0\r\n        );\r\n      }",
 };
 
 export const assetNames = Object.keys(assetContents);

@@ -45,7 +45,10 @@ export default function App() {
     gl.useProgram(program);
 
     // Triangle vertices
-    const vertices = new Float32Array([0.0, 0.5, -0.5, -0.5, 0.5, -0.5]);
+    const vertices = new Float32Array([
+      0.0, 0.5, 0.0, -0.5, -0.5, 1.0, 0.5, -0.5, 1.0,
+    ]);
+    const indices = new Uint32Array([0, 1, 2]);
 
     // Create buffer
     const buffer = gl.createBuffer();
@@ -55,9 +58,12 @@ export default function App() {
     // Bind attribute
     const positionLoc = gl.getAttribLocation(program, "a_position");
     gl.enableVertexAttribArray(positionLoc);
-    gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
-
+    gl.vertexAttribPointer(positionLoc, 3, gl.FLOAT, false, 3 * 4, 0);
     const angleLoc = gl.getUniformLocation(program, "u_angle");
+
+    const ebo = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
 
     let angle = 0;
 
@@ -69,7 +75,7 @@ export default function App() {
       gl.clear(gl.COLOR_BUFFER_BIT);
 
       gl.uniform1f(angleLoc, angle);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);
 
       gl.endFrameEXP(); // Important: tells GLView to display the frame
       animationRef.current = requestAnimationFrame(render);

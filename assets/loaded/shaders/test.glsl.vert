@@ -1,4 +1,4 @@
-attribute vec2 a_position;
+attribute vec3 a_position;
       uniform float u_angle;
       void main() {
         float cosA = cos(u_angle);
@@ -6,6 +6,6 @@ attribute vec2 a_position;
         gl_Position = vec4(
           a_position.x * cosA - a_position.y * sinA,
           a_position.x * sinA + a_position.y * cosA,
-          0.0, 1.0
+          a_position.z, 1.0
         );
       }
