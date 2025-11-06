@@ -7,7 +7,8 @@ const assetsRoot = path.join(projectRoot, "assets", "loaded"); // adjust if need
 const outputFile = path.join(projectRoot, "generated", "assetMap.ts");
 
 // file extensions to include (text-based)
-const INCLUDE_RE = /\.(vert|frag|glsl|vs|fs|txt|json|cfg|shader|wgsl|glslfrag|glslvert)$/i;
+const INCLUDE_RE =
+  /\.(vert|frag|glsl|vs|fs|txt|json|cfg|shader|wgsl|glslfrag|glslvert|obj)$/i;
 
 function walk(dir) {
   let results = [];
@@ -40,7 +41,10 @@ const header = `// AUTO-GENERATED FILE — DO NOT EDIT
 // Embeds asset file contents as strings
 \n`;
 
-const lines = [header, "export const assetContents: Record<string, string> = {"];
+const lines = [
+  header,
+  "export const assetContents: Record<string, string> = {",
+];
 
 for (const file of files) {
   // key: path inside assetsRoot (e.g. "shaders/test.glsl.frag")

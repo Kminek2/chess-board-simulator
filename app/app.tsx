@@ -1,3 +1,4 @@
+import Model from "@/hooks/engine/Model";
 import { Shader } from "@/hooks/engine/Shader";
 import { ExpoWebGLRenderingContext, GLView } from "expo-gl";
 import React, { useEffect, useRef } from "react";
@@ -44,11 +45,11 @@ export default function App() {
 
     gl.useProgram(program);
 
+    const testModel = new Model("test");
+
     // Triangle vertices
-    const vertices = new Float32Array([
-      0.0, 0.5, 0.0, -0.5, -0.5, 1.0, 0.5, -0.5, 1.0,
-    ]);
-    const indices = new Uint32Array([0, 1, 2]);
+    const vertices = testModel.getVertices();
+    const indices = testModel.getIndices();
 
     // Create buffer
     const buffer = gl.createBuffer();
@@ -68,7 +69,7 @@ export default function App() {
     let angle = 0;
 
     function render() {
-      angle += 0.02;
+      //angle += 0.02;
 
       gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
       gl.clearColor(0, 0, 0, 1);
