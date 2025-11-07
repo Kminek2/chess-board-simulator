@@ -37,7 +37,7 @@ export default class Model {
       line = line.trim();
       if (line.startsWith("v ")) {
         const [, x, y, z] = line.split(/\s+/);
-        positions.push(parseFloat(x), parseFloat(z), parseFloat(y));
+        positions.push(parseFloat(x), parseFloat(y), parseFloat(z));
       } else if (line.startsWith("vt ")) {
         const [, u, v] = line.split(/\s+/);
         texcoords.push(parseFloat(u), parseFloat(v));

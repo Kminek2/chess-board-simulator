@@ -1,4 +1,5 @@
 import Model from "@/hooks/engine/Model";
+import ModelManager from "@/hooks/engine/ModelManager";
 import { Shader } from "@/hooks/engine/Shader";
 import { ExpoWebGLRenderingContext, GLView } from "expo-gl";
 import React, { useEffect, useRef } from "react";
@@ -45,26 +46,15 @@ export default function App() {
 
     gl.useProgram(program);
 
+    ModelManager.init(gl);
+    ModelManager.addModel(new Model("test"));
     const testModel = new Model("test");
-
-    // Triangle vertices
-    const vertices = testModel.getVertices();
-    const indices = testModel.getIndices();
-
-    // Create buffer
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
     // Bind attribute
     const positionLoc = gl.getAttribLocation(program, "a_position");
     gl.enableVertexAttribArray(positionLoc);
     gl.vertexAttribPointer(positionLoc, 3, gl.FLOAT, false, 3 * 4, 0);
     const angleLoc = gl.getUniformLocation(program, "u_angle");
-
-    const ebo = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
 
     let angle = 0;
 
@@ -76,7 +66,12 @@ export default function App() {
       gl.clear(gl.COLOR_BUFFER_BIT);
 
       gl.uniform1f(angleLoc, angle);
-      gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);
+      gl.drawElements(
+        gl.TRIANGLES,
+        ModelManager.getIndicesLength(),
+        gl.UNSIGNED_INT,
+        0
+      );
 
       gl.endFrameEXP(); // Important: tells GLView to display the frame
       animationRef.current = requestAnimationFrame(render);
