@@ -1,7 +1,11 @@
+import DataManager from "@/hooks/engine/DataManager";
+import GameObj from "@/hooks/engine/GameObj";
 import Model from "@/hooks/engine/Model";
 import ModelManager from "@/hooks/engine/ModelManager";
 import { Shader } from "@/hooks/engine/Shader";
+import Transform from "@/hooks/engine/Transform";
 import { ExpoWebGLRenderingContext, GLView } from "expo-gl";
+import { Vector3 } from "math.gl";
 import React, { useEffect, useRef } from "react";
 import { View } from "react-native";
 
@@ -47,14 +51,17 @@ export default function App() {
     gl.useProgram(program);
 
     ModelManager.init(gl);
-    ModelManager.addModel(new Model("test"));
-    const testModel = new Model("test");
+    DataManager.init(gl);
+    const obj = new GameObj(new Model("test"), new Transform(new Vector3(0, 0, 0), new Vector3(), new Vector3(1, 1, 1)))
 
     // Bind attribute
-    const positionLoc = gl.getAttribLocation(program, "a_position");
-    gl.enableVertexAttribArray(positionLoc);
-    gl.vertexAttribPointer(positionLoc, 3, gl.FLOAT, false, 3 * 4, 0);
-    const angleLoc = gl.getUniformLocation(program, "u_angle");
+    const position_loc = gl.getAttribLocation(program, "a_position");
+    gl.enableVertexAttribArray(position_loc);
+    gl.vertexAttribPointer(position_loc, 3, gl.FLOAT, false, 3 * 4, 0);
+
+    const id_loc = gl.getAttribLocation(program, "a_instanceID");
+    gl.enableVertexAttribArray(id_loc);
+    gl.vertexAttribPointer(id_loc, 1, gl.FLOAT, false, 4, 0);
 
     let angle = 0;
 
@@ -65,13 +72,33 @@ export default function App() {
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
 
-      gl.uniform1f(angleLoc, angle);
-      gl.drawElements(
-        gl.TRIANGLES,
-        ModelManager.getIndicesLength(),
-        gl.UNSIGNED_INT,
-        0
+      DataManager.updateBuffers(program);
+
+      DataManager.objects.forEach((v, k) => {
+        console.log(k)
+        console.log(v)
+        const vertex_off = ModelManager.getModelData(k)?[0]:null;
+        if(!vertex_off)
+          throw Error("NOOOO")
+
+        gl.enableVertexAttribArray(position_loc);
+        gl.vertexAttribPointer(position_loc, 3, gl.FLOAT, false, 3 * 4, vertex_off[0] * 4);
+
+        gl.enableVertexAttribArray(id_loc);
+        gl.vertexAttribPointer(id_loc, 1, gl.FLOAT, false, 4, vertex_off[5] * 4);
+
+        console.log("----- App logs ------")
+        console.log(ModelManager.getIndicesLength(k))
+        console.log(ModelManager.getInstanceCount(k))
+        console.log(ModelManager.getInstanceOffset(k))
+
+        gl.drawElements(
+          gl.TRIANGLES,
+          ModelManager.getIndicesLength(k) * ModelManager.getInstanceCount(k),
+          gl.UNSIGNED_INT,
+          ModelManager.getInstanceOffset(k)
       );
+      })
 
       gl.endFrameEXP(); // Important: tells GLView to display the frame
       animationRef.current = requestAnimationFrame(render);

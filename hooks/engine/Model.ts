@@ -1,9 +1,11 @@
 import readFile from "@/hooks/helpers/read-file";
 import { Paths } from "expo-file-system";
+import ModelManager from "./ModelManager";
 
 export default class Model {
   private _vertices: Float32Array;
   private _indices: Uint32Array;
+  private _name: string;
   private static _MODEL_FOLDER = "./models";
   private static _MODEL_EXTENSION = ".obj";
 
@@ -12,6 +14,13 @@ export default class Model {
 
     this._vertices = model_data.positions;
     this._indices = model_data.indices;
+    this._name = name;
+
+    ModelManager.addModel(this);
+  }
+
+  public get name(){
+    return this._name;
   }
 
   public getVertices() {
