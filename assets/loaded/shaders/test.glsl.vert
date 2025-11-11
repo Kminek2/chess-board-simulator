@@ -1,8 +1,16 @@
 attribute vec3 a_position;
+attribute vec2 a_texcoord;
 attribute float a_instanceID;
 
 uniform sampler2D u_transformsTex;
 uniform float u_numInstances;
+
+// atlas & texture uniforms (set per-draw)
+uniform vec2 u_texOffset; // in pixels
+uniform vec2 u_texSize; // in pixels
+uniform vec2 u_atlasSize; // in pixels
+
+varying vec2 v_uv;
 
 mat4 getMatrix(float id) {
     float v = (id + 0.5) / u_numInstances;
@@ -15,5 +23,9 @@ mat4 getMatrix(float id) {
 
 void main() {
   mat4 model = getMatrix(a_instanceID);
-  gl_Position = vec4(a_position, 1.0);
+  gl_Position = model * vec4(a_position, 1.0);
+
+  // remap local texcoord (0..1) into atlas pixel space and then to atlas UVs
+  vec2 uv_pixels = a_texcoord * u_texSize + u_texOffset;
+  v_uv = uv_pixels / u_atlasSize;
 }

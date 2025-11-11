@@ -6,9 +6,9 @@ const projectRoot = path.join(__dirname, "..");
 const assetsRoot = path.join(projectRoot, "assets", "loaded"); // adjust if needed
 const outputFile = path.join(projectRoot, "generated", "assetMap.ts");
 
-// file extensions to include (text-based)
+// file extensions to include (text-based + images)
 const INCLUDE_RE =
-  /\.(vert|frag|glsl|vs|fs|txt|json|cfg|shader|wgsl|glslfrag|glslvert|obj)$/i;
+  /\.(vert|frag|glsl|vs|fs|txt|json|cfg|shader|wgsl|glslfrag|glslvert|obj|png|jpe?g)$/i;
 
 function walk(dir) {
   let results = [];
@@ -49,10 +49,17 @@ const lines = [
 for (const file of files) {
   // key: path inside assetsRoot (e.g. "shaders/test.glsl.frag")
   const key = path.relative(assetsRoot, file).replace(/\\/g, "/");
-  const raw = fs.readFileSync(file, "utf8");
-
-  // JSON.stringify safely escapes the content for us
-  const esc = JSON.stringify(raw);
+  const ext = path.extname(file).toLowerCase();
+  let esc;
+  if (ext === ".png" || ext === ".jpg" || ext === ".jpeg") {
+    // read binary and store base64 string (no data URI prefix)
+    const bin = fs.readFileSync(file);
+    esc = JSON.stringify(bin.toString("base64"));
+  } else {
+    const raw = fs.readFileSync(file, "utf8");
+    // JSON.stringify safely escapes the content for us
+    esc = JSON.stringify(raw);
+  }
 
   lines.push(`  ${JSON.stringify(key)}: ${esc},`);
 }

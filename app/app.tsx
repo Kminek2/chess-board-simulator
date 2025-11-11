@@ -3,14 +3,17 @@ import GameObj from "@/hooks/engine/GameObj";
 import Model from "@/hooks/engine/Model";
 import ModelManager from "@/hooks/engine/ModelManager";
 import { Shader } from "@/hooks/engine/Shader";
+import TextureManager from "@/hooks/engine/Texture";
 import Transform from "@/hooks/engine/Transform";
 import { ExpoWebGLRenderingContext, GLView } from "expo-gl";
 import { Vector3 } from "math.gl";
-import React, { useEffect, useRef } from "react";
-import { View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet } from "react-native";
 
 export default function App() {
   const animationRef = useRef<number | null>(null);
+  const [fps, setFps] = useState(0);
+  const fpsRef = useRef({ frames: 0, lastTime: Date.now() });
 
   async function createProgram(
     gl: ExpoWebGLRenderingContext,
@@ -43,77 +46,215 @@ export default function App() {
   }
 
   async function onContextCreate(gl: ExpoWebGLRenderingContext) {
-    const vertex_shader = new Shader(gl, "test", gl.VERTEX_SHADER);
-    const fragment_shader = new Shader(gl, "test", gl.FRAGMENT_SHADER);
+    try {
+      const ext = gl.getExtension("OES_element_index_uint");
 
-    const program = await createProgram(gl, vertex_shader, fragment_shader);
+      if (ext == null) {
+        throw new Error(
+          "OES_element_index_uint not supported. Please use a compatible (more powerful) device."
+        );
+      }
+      const vertex_shader = new Shader(gl, "test", gl.VERTEX_SHADER);
+      const fragment_shader = new Shader(gl, "test", gl.FRAGMENT_SHADER);
 
-    gl.useProgram(program);
+      const program = await createProgram(gl, vertex_shader, fragment_shader);
 
-    ModelManager.init(gl);
-    DataManager.init(gl);
-    const obj = new GameObj(new Model("test"), new Transform(new Vector3(0, 0, 0), new Vector3(), new Vector3(1, 1, 1)))
+      gl.useProgram(program);
 
-    // Bind attribute
-    const position_loc = gl.getAttribLocation(program, "a_position");
-    gl.enableVertexAttribArray(position_loc);
-    gl.vertexAttribPointer(position_loc, 3, gl.FLOAT, false, 3 * 4, 0);
+  // Enable depth testing so closer fragments occlude farther ones
+  gl.enable(gl.DEPTH_TEST);
+  // Use less-or-equal so fragments with equal depth still pass (typical for perspective)
+  gl.depthFunc(gl.LEQUAL);
+  // Ensure depth clear value is 1.0 (farthest)
+  gl.clearDepth(1.0);
+  // Enable back-face culling to skip rendering triangles facing away from the camera
+  gl.enable(gl.CULL_FACE);
+  gl.cullFace(gl.BACK);
 
-    const id_loc = gl.getAttribLocation(program, "a_instanceID");
-    gl.enableVertexAttribArray(id_loc);
-    gl.vertexAttribPointer(id_loc, 1, gl.FLOAT, false, 4, 0);
-
-    let angle = 0;
-
-    function render() {
-      //angle += 0.02;
-
-      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-      gl.clearColor(0, 0, 0, 1);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-
-      DataManager.updateBuffers(program);
-
-      DataManager.objects.forEach((v, k) => {
-        console.log(k)
-        console.log(v)
-        const vertex_off = ModelManager.getModelData(k)?[0]:null;
-        if(!vertex_off)
-          throw Error("NOOOO")
-
-        gl.enableVertexAttribArray(position_loc);
-        gl.vertexAttribPointer(position_loc, 3, gl.FLOAT, false, 3 * 4, vertex_off[0] * 4);
-
-        gl.enableVertexAttribArray(id_loc);
-        gl.vertexAttribPointer(id_loc, 1, gl.FLOAT, false, 4, vertex_off[5] * 4);
-
-        console.log("----- App logs ------")
-        console.log(ModelManager.getIndicesLength(k))
-        console.log(ModelManager.getInstanceCount(k))
-        console.log(ModelManager.getInstanceOffset(k))
-
-        gl.drawElements(
-          gl.TRIANGLES,
-          ModelManager.getIndicesLength(k) * ModelManager.getInstanceCount(k),
-          gl.UNSIGNED_INT,
-          ModelManager.getInstanceOffset(k)
+      console.log("App: about to ModelManager.init");
+      ModelManager.init(gl);
+      console.log("App: done ModelManager.init");
+      console.log("App: about to TextureManager.init");
+      await TextureManager.init(gl);
+      console.log("App: done TextureManager.init");
+      console.log("App: about to DataManager.init");
+      DataManager.init(gl);
+      console.log("App: done DataManager.init");
+      const obj = new GameObj(
+        new Model("cube-test"),
+        new Transform(
+          new Vector3(0, 0, -0.5),
+          new Vector3(),
+          new Vector3(0.1, 0.1, 0.1)
+        )
       );
-      })
+      console.log(
+        "After creating GameObj, instance count =",
+        ModelManager.getInstanceCount("cube-test")
+      );
 
-      gl.endFrameEXP(); // Important: tells GLView to display the frame
-      animationRef.current = requestAnimationFrame(render);
+      // Bind attributes (interleaved vertex: x,y,z,u,v) -> stride = 5 * 4
+      const position_loc = gl.getAttribLocation(program, "a_position");
+      const texcoord_loc = gl.getAttribLocation(program, "a_texcoord");
+      const id_loc = gl.getAttribLocation(program, "a_instanceID");
+
+      const VERT_STRIDE = 5 * 4; // bytes
+
+      gl.enableVertexAttribArray(position_loc);
+      gl.enableVertexAttribArray(texcoord_loc);
+      gl.enableVertexAttribArray(id_loc);
+
+      // Default binding to start of vertex buffer; per-model we will rebind with offsets
+      gl.bindBuffer(gl.ARRAY_BUFFER, ModelManager.getVBO());
+      gl.vertexAttribPointer(position_loc, 3, gl.FLOAT, false, VERT_STRIDE, 0);
+      gl.vertexAttribPointer(
+        texcoord_loc,
+        2,
+        gl.FLOAT,
+        false,
+        VERT_STRIDE,
+        3 * 4
+      );
+
+      // ID attribute uses separate buffer (VBOIDs)
+      gl.bindBuffer(gl.ARRAY_BUFFER, ModelManager.getVBOIDs());
+      gl.vertexAttribPointer(id_loc, 1, gl.FLOAT, false, 1 * 4, 0);
+
+      let angle = 0.1;
+
+      function render() {
+        angle += 0.02;
+
+        gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+        gl.clearColor(0, 0, 0, 1);
+        // Clear both color and depth each frame
+        gl.clearDepth(1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        DataManager.updateBuffers(program);
+
+        // FPS counting: increment frames and report once per second
+        fpsRef.current.frames += 1;
+        const now = Date.now();
+        const elapsed = now - fpsRef.current.lastTime;
+        if (elapsed >= 1000) {
+          const fpsVal = Math.round((fpsRef.current.frames * 1000) / elapsed);
+          setFps(fpsVal);
+          console.log(`FPS: ${fpsVal}`);
+          fpsRef.current.frames = 0;
+          fpsRef.current.lastTime = now;
+        }
+
+        obj.transform.rotate(new Vector3(0, angle, 0));
+
+        DataManager.objects.forEach((v, k) => {
+          // Minimal per-model logging to avoid flooding Metro output
+          // console.log(k);
+          // console.log(v);
+          const modelData = ModelManager.getModelData(k);
+          if (!modelData) throw Error("NOOOO");
+
+          // Skip models that currently have zero instances (preloaded but unused)
+          if (ModelManager.getInstanceCount(k) === 0) return;
+
+          // Bind vertex buffer before setting attribute pointers
+          gl.bindBuffer(gl.ARRAY_BUFFER, ModelManager.getVBO());
+          gl.vertexAttribPointer(
+            position_loc,
+            3,
+            gl.FLOAT,
+            false,
+            VERT_STRIDE,
+            modelData.vertStart * 4
+          );
+          gl.vertexAttribPointer(
+            texcoord_loc,
+            2,
+            gl.FLOAT,
+            false,
+            VERT_STRIDE,
+            (modelData.vertStart + 3) * 4
+          );
+
+          // Bind IDs buffer before pointer setup
+          gl.bindBuffer(gl.ARRAY_BUFFER, ModelManager.getVBOIDs());
+          gl.vertexAttribPointer(
+            id_loc,
+            1,
+            gl.FLOAT,
+            false,
+            1 * 4,
+            modelData.instanceOffset * 4
+          );
+
+          // Debug info (commented out to reduce log noise). Enable if necessary:
+          // console.log("----- App logs ------");
+          // console.log(ModelManager.getIndicesLength(k));
+          // console.log(ModelManager.getInstanceCount(k));
+          // console.log(ModelManager.getInstanceOffset(k));
+
+          // Bind atlas and set atlas uniforms for this model
+          const meta = (TextureManager as any).getMeta(k);
+          const atlasSize = TextureManager.getAtlasSize();
+          // bind atlas to texture unit 1
+          TextureManager.bindAtlas(gl, 1);
+          const u_atlas_loc = gl.getUniformLocation(program, "u_atlas");
+          if (u_atlas_loc) gl.uniform1i(u_atlas_loc, 1);
+          const u_texOffset = gl.getUniformLocation(program, "u_texOffset");
+          const u_texSize = gl.getUniformLocation(program, "u_texSize");
+          const u_atlasSize = gl.getUniformLocation(program, "u_atlasSize");
+          if (u_texOffset) gl.uniform2f(u_texOffset, meta.x, meta.y);
+          if (u_texSize) gl.uniform2f(u_texSize, meta.width, meta.height);
+          if (u_atlasSize)
+            gl.uniform2f(u_atlasSize, atlasSize.width, atlasSize.height);
+
+          // Ensure EBO is bound; drawElements offset is in bytes
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ModelManager.getEBO());
+          gl.drawElements(
+            gl.TRIANGLES,
+            ModelManager.getIndicesLength(k) * ModelManager.getInstanceCount(k),
+            gl.UNSIGNED_INT,
+            ModelManager.getInstanceOffset(k) * 4
+          );
+        });
+
+        gl.endFrameEXP(); // Important: tells GLView to display the frame
+        animationRef.current = requestAnimationFrame(render);
+      }
+
+      render();
+    } catch (err) {
+      console.error(err);
     }
-
-    render();
   }
 
   useEffect(() => {
     return () => cancelAnimationFrame(animationRef.current!);
   }, []);
 
+  const styles = StyleSheet.create({
+    fpsContainer: {
+      position: "absolute",
+      top: 8,
+      left: 8,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 6,
+    },
+    fpsText: {
+      color: "white",
+      fontSize: 12,
+      fontWeight: "600",
+    },
+  });
+
   return (
     <View style={{ flex: 1, backgroundColor: "black" }}>
       <GLView style={{ flex: 1 }} onContextCreate={onContextCreate} />
+      <View style={styles.fpsContainer} pointerEvents="none">
+        <Text style={styles.fpsText}>{fps} FPS</Text>
+      </View>
     </View>
   );
 }
