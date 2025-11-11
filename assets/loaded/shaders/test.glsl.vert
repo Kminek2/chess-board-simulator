@@ -5,6 +5,10 @@ attribute float a_instanceID;
 uniform sampler2D u_transformsTex;
 uniform float u_numInstances;
 
+// Camera matrices
+uniform mat4 u_view;
+uniform mat4 u_projection;
+
 // atlas & texture uniforms (set per-draw)
 uniform vec2 u_texOffset; // in pixels
 uniform vec2 u_texSize; // in pixels
@@ -23,7 +27,8 @@ mat4 getMatrix(float id) {
 
 void main() {
   mat4 model = getMatrix(a_instanceID);
-  gl_Position = model * vec4(a_position, 1.0);
+  // Apply camera view/projection
+  gl_Position = u_projection * u_view * model * vec4(a_position, 1.0);
 
   // remap local texcoord (0..1) into atlas pixel space and then to atlas UVs
   vec2 uv_pixels = a_texcoord * u_texSize + u_texOffset;

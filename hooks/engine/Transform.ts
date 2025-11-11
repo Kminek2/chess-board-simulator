@@ -58,12 +58,14 @@ export default class Transform {
     }
 
     public translate(by: Vector3){
-        this.pos.add(by.multiply(this._front));
+        // Update internal position directly (avoid using the public getter which returns a copy)
+        this._pos = this._pos.add(by.multiply(this._front));
         this._updates = true;
     }
 
     public move(by: Vector3){
-        this.pos.add(by);
+        // Move by world-space vector
+        this._pos = this._pos.add(by);
         this._updates = true;
     }
 

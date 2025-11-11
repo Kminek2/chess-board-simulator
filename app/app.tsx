@@ -1,3 +1,4 @@
+import Camera from "@/hooks/engine/Camera";
 import DataManager from "@/hooks/engine/DataManager";
 import GameObj from "@/hooks/engine/GameObj";
 import Model from "@/hooks/engine/Model";
@@ -8,7 +9,7 @@ import Transform from "@/hooks/engine/Transform";
 import { ExpoWebGLRenderingContext, GLView } from "expo-gl";
 import { Vector3 } from "math.gl";
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 export default function App() {
   const animationRef = useRef<number | null>(null);
@@ -61,15 +62,15 @@ export default function App() {
 
       gl.useProgram(program);
 
-  // Enable depth testing so closer fragments occlude farther ones
-  gl.enable(gl.DEPTH_TEST);
-  // Use less-or-equal so fragments with equal depth still pass (typical for perspective)
-  gl.depthFunc(gl.LEQUAL);
-  // Ensure depth clear value is 1.0 (farthest)
-  gl.clearDepth(1.0);
-  // Enable back-face culling to skip rendering triangles facing away from the camera
-  gl.enable(gl.CULL_FACE);
-  gl.cullFace(gl.BACK);
+      // Enable depth testing so closer fragments occlude farther ones
+      gl.enable(gl.DEPTH_TEST);
+      // Use less-or-equal so fragments with equal depth still pass (typical for perspective)
+      gl.depthFunc(gl.LEQUAL);
+      // Ensure depth clear value is 1.0 (farthest)
+      gl.clearDepth(1.0);
+      // Enable back-face culling to skip rendering triangles facing away from the camera
+      gl.enable(gl.CULL_FACE);
+      gl.cullFace(gl.BACK);
 
       console.log("App: about to ModelManager.init");
       ModelManager.init(gl);
@@ -85,7 +86,7 @@ export default function App() {
         new Transform(
           new Vector3(0, 0, -0.5),
           new Vector3(),
-          new Vector3(0.1, 0.1, 0.1)
+          new Vector3(1, 1, 1)
         )
       );
       console.log(
@@ -97,6 +98,21 @@ export default function App() {
       const position_loc = gl.getAttribLocation(program, "a_position");
       const texcoord_loc = gl.getAttribLocation(program, "a_texcoord");
       const id_loc = gl.getAttribLocation(program, "a_instanceID");
+
+      // Cache uniform locations for camera matrices
+      const u_view_loc = gl.getUniformLocation(program, "u_view");
+      const u_proj_loc = gl.getUniformLocation(program, "u_projection");
+
+      // Create and register a main camera
+      const cam = new Camera(
+        60,
+        gl.drawingBufferWidth / gl.drawingBufferHeight,
+        0.1,
+        1000
+      );
+      // position camera a bit back so unit cube is visible
+      cam.transform.pos = new Vector3(0, 0, 0);
+      cam.transform.rot = new Vector3(0, 0, 0);
 
       const VERT_STRIDE = 5 * 4; // bytes
 
@@ -132,6 +148,22 @@ export default function App() {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         DataManager.updateBuffers(program);
+
+        Camera.main.transform.move(new Vector3(0, 0, -0.1));
+
+        // Upload camera matrices each frame (as plain uniforms)
+        if (u_view_loc) {
+          const vm = Camera.main.viewMatrix.toArray
+            ? Camera.main.viewMatrix.toArray()
+            : Camera.main.viewMatrix;
+          gl.uniformMatrix4fv(u_view_loc, false, new Float32Array(vm as any));
+        }
+        if (u_proj_loc) {
+          const pm = Camera.main.projectionMatrix.toArray
+            ? Camera.main.projectionMatrix.toArray()
+            : Camera.main.projectionMatrix;
+          gl.uniformMatrix4fv(u_proj_loc, false, new Float32Array(pm as any));
+        }
 
         // FPS counting: increment frames and report once per second
         fpsRef.current.frames += 1;
