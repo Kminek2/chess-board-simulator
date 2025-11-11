@@ -1,9 +1,11 @@
 import { assetContents } from "@/generated/assetMap"; // adjust relative path
+import Logger from "@/hooks/helpers/logger";
 
 export default function readFile(filename: string): string {
   // filename should match the key in the generated map, e.g. "shaders/test.glsl.frag"
   const content = assetContents[filename];
   if (content === undefined) {
+    Logger.error(`Asset not found in embedded map: ${filename}`);
     throw new Error(`Asset not found in embedded map: ${filename}`);
   }
   return content;

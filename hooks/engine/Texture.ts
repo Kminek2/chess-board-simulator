@@ -2,6 +2,7 @@ import { assetContents } from "@/generated/assetMap";
 import * as base64js from "base64-js";
 import { ExpoWebGLRenderingContext } from "expo-gl";
 import * as UPNG from "upng-js";
+import Logger from "@/hooks/helpers/logger";
 
 type TexMeta = {
   name: string;
@@ -21,7 +22,7 @@ export default class TextureManager {
     if (!this._registered.has(name)) {
       // placeholder until atlas is built
       this._registered.set(name, { name, x: 0, y: 0, width: 1, height: 1 });
-      console.log(`TextureManager.registerTexture: registered placeholder for ${name}`);
+      Logger.debug(`TextureManager.registerTexture: registered placeholder for ${name}`);
     }
   }
 
@@ -35,7 +36,7 @@ export default class TextureManager {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
     // Try to load image data from generated assetContents (base64 strings produced by gen script)
-    console.log("TextureManager.init: registered textures:", Array.from(this._registered.keys()));
+  Logger.info("TextureManager.init: registered textures:", Array.from(this._registered.keys()));
     const imgs: {
       name: string;
       width: number;
@@ -46,7 +47,7 @@ export default class TextureManager {
       const pngKey = `textures/${name}.png`;
       const data = (assetContents as any)[pngKey];
       if (!data) {
-        console.log(`TextureManager.init: no embedded asset for key ${pngKey}`);
+        Logger.debug(`TextureManager.init: no embedded asset for key ${pngKey}`);
         continue;
       }
 
@@ -74,7 +75,7 @@ export default class TextureManager {
         }
 
         if (!rgba) {
-          console.warn(`TextureManager: UPNG.toRGBA8 returned unexpected result for ${name}`);
+          Logger.warn(`TextureManager: UPNG.toRGBA8 returned unexpected result for ${name}`);
           continue;
         }
 
@@ -85,10 +86,7 @@ export default class TextureManager {
           rgba: rgba,
         });
       } catch (err) {
-        console.warn(
-          `TextureManager: failed to decode embedded image for ${name}:`,
-          err
-        );
+        Logger.warn(`TextureManager: failed to decode embedded image for ${name}:`, err);
       }
     }
 
@@ -130,7 +128,7 @@ export default class TextureManager {
         .filter((it) => !validImgs.includes(it))
         .map((it) => it.name || "<unknown>")
         .join(", ");
-      console.warn(`TextureManager: skipping ${skipped} - invalid or missing RGBA data`);
+      Logger.warn(`TextureManager: skipping ${skipped} - invalid or missing RGBA data`);
     }
 
     if (validImgs.length === 0) {
@@ -193,7 +191,7 @@ export default class TextureManager {
     }
 
     // Reserve a dedicated 1x1 white pixel per-missing texture so placeholders don't overlap real images
-    if (missingNames.length > 0) {
+      if (missingNames.length > 0) {
       const white = new Uint8Array([255, 255, 255, 255]);
       for (const name of missingNames) {
         // place white pixel at (xOff, 0)
@@ -208,7 +206,7 @@ export default class TextureManager {
         });
         xOff += 1;
       }
-      console.log(`TextureManager: reserved ${missingNames.length} placeholder pixel(s) for missing textures: ${missingNames.join(", ")}`);
+      Logger.debug(`TextureManager: reserved ${missingNames.length} placeholder pixel(s) for missing textures: ${missingNames.join(", ")}`);
     }
 
     gl.texImage2D(
@@ -225,8 +223,8 @@ export default class TextureManager {
 
     this._atlasWidth = atlasWidth;
     this._atlasHeight = atlasHeight;
-    console.log(`TextureManager: built atlas ${atlasWidth}x${atlasHeight} with ${validImgs.length} images`);
-    this._registered.forEach((m) => console.log("Texture meta:", m));
+    Logger.info(`TextureManager: built atlas ${atlasWidth}x${atlasHeight} with ${validImgs.length} images`);
+    this._registered.forEach((m) => Logger.debug("Texture meta:", m));
   }
 
   public static bindAtlas(gl: ExpoWebGLRenderingContext, unit = 1) {

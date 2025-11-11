@@ -103,6 +103,10 @@ export default function App() {
       const u_view_loc = gl.getUniformLocation(program, "u_view");
       const u_proj_loc = gl.getUniformLocation(program, "u_projection");
 
+  // Reusable buffers for camera matrices to avoid allocating Float32Array each frame
+  const _cameraViewBuf = new Float32Array(16);
+  const _cameraProjBuf = new Float32Array(16);
+
       // Create and register a main camera
       const cam = new Camera(
         60,
@@ -156,13 +160,16 @@ export default function App() {
           const vm = Camera.main.viewMatrix.toArray
             ? Camera.main.viewMatrix.toArray()
             : Camera.main.viewMatrix;
-          gl.uniformMatrix4fv(u_view_loc, false, new Float32Array(vm as any));
+          // reuse the same Float32Array instance and copy values into it
+          _cameraViewBuf.set(vm as any);
+          gl.uniformMatrix4fv(u_view_loc, false, _cameraViewBuf);
         }
         if (u_proj_loc) {
           const pm = Camera.main.projectionMatrix.toArray
             ? Camera.main.projectionMatrix.toArray()
             : Camera.main.projectionMatrix;
-          gl.uniformMatrix4fv(u_proj_loc, false, new Float32Array(pm as any));
+          _cameraProjBuf.set(pm as any);
+          gl.uniformMatrix4fv(u_proj_loc, false, _cameraProjBuf);
         }
 
         // FPS counting: increment frames and report once per second

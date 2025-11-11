@@ -3,6 +3,7 @@ import ModelManager from "./ModelManager";
 import Transform from "./Transform";
 import ObjectScript from "./ObjectScript";
 import DataManager from "./DataManager";
+import Logger from "@/hooks/helpers/logger";
 
 export default class GameObj {
     private _transform: Transform;
@@ -17,9 +18,9 @@ export default class GameObj {
             DataManager.addObj(this);
             // Notify ModelManager that an instance of this model exists
             // (models are preloaded with 0 instances)
-            console.log(`GameObj: registering instance for model ${this._model_name}`);
+            Logger.debug(`GameObj: registering instance for model ${this._model_name}`);
             ModelManager.addInstanceByName(this._model_name);
-            console.log(`GameObj: registered instance for model ${this._model_name}`);
+            Logger.debug(`GameObj: registered instance for model ${this._model_name}`);
     }
 
     public get model_name(){

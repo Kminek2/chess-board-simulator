@@ -11,28 +11,10 @@ export default class Model {
 
   constructor(name: string) {
     const model_data = Model._loadDataFromModel(Model._getModelSrc(name));
-    // interleaved vertices will contain positions and texcoords when available
-    // positions: model_data.positions (3 floats per vertex)
-    // texcoords: model_data.texcoords (2 floats per vertex) - may be empty
-    const posCount = model_data.positions.length / 3;
-    const hasTex = model_data.texcoords.length === posCount * 2;
-
-    const interleaved = new Float32Array(posCount * (3 + 2));
-    for (let i = 0; i < posCount; i++) {
-      interleaved[i * 5 + 0] = model_data.positions[i * 3 + 0];
-      interleaved[i * 5 + 1] = model_data.positions[i * 3 + 1];
-      interleaved[i * 5 + 2] = model_data.positions[i * 3 + 2];
-      if (hasTex) {
-        interleaved[i * 5 + 3] = model_data.texcoords[i * 2 + 0];
-        interleaved[i * 5 + 4] = model_data.texcoords[i * 2 + 1];
-      } else {
-        interleaved[i * 5 + 3] = 0;
-        interleaved[i * 5 + 4] = 0;
-      }
-    }
-
-    this._vertices = interleaved;
-    this._texcoords = model_data.texcoords;
+    // model_data.vertices is an interleaved Float32Array [x,y,z,u,v] per-vertex
+    this._vertices = model_data.vertices;
+    // keep texcoords for compatibility (may be empty)
+    this._texcoords = model_data.texcoords || new Float32Array(0);
     this._indices = model_data.indices;
     this._name = name;
   }
@@ -54,17 +36,19 @@ export default class Model {
   }
 
   private static _loadDataFromModel(model_src: string) {
-    // First pass: collect raw v/vt/vn data and faces with their indices
+    // We'll build unique vertices for each (pos,uv,norm) tuple to support OBJ files
     const positions: number[] = [];
     const rawTexcoords: number[] = [];
     const normals: number[] = [];
 
+    const lines = model_src.split("\n");
+    // faces will be a flat list of {vi,vti,vni}
     type FaceIdx = { vi: number; vti?: number; vni?: number };
     const faces: FaceIdx[] = [];
 
-    const lines = model_src.split("\n");
     for (let line of lines) {
       line = line.trim();
+      if (line.length === 0 || line.startsWith("#")) continue;
       if (line.startsWith("v ")) {
         const [, x, y, z] = line.split(/\s+/);
         positions.push(parseFloat(x), parseFloat(y), parseFloat(z));
@@ -76,36 +60,53 @@ export default class Model {
         normals.push(parseFloat(x), parseFloat(y), parseFloat(z));
       } else if (line.startsWith("f ")) {
         const [, ...faceParts] = line.split(/\s+/);
+        // triangulate polygons (OBJ faces may have more than 3 verts)
+        const tris: FaceIdx[] = [];
         for (let f of faceParts) {
-          // f format: v[/vt[/vn]]
           const parts = f.split("/");
           const vi = parseInt(parts[0], 10) - 1;
           const vti = parts[1] ? parseInt(parts[1], 10) - 1 : undefined;
           const vni = parts[2] ? parseInt(parts[2], 10) - 1 : undefined;
-          faces.push({ vi, vti, vni });
+          tris.push({ vi, vti, vni });
+        }
+        // If polygon is a triangle or quad etc, fan-triangulate
+        for (let i = 1; i + 1 < tris.length; i++) {
+          faces.push(tris[0]);
+          faces.push(tris[i]);
+          faces.push(tris[i + 1]);
         }
       }
     }
 
-    const posCount = positions.length / 3;
-
-    // Create per-vertex texcoord array (defaults to 0s). We'll map vt indices referenced in faces
-    const texcoordsPerVertex = new Float32Array(posCount * 2);
-    for (let i = 0; i < texcoordsPerVertex.length; i++) texcoordsPerVertex[i] = 0;
-
+    // Build unique vertex list
+    const uniqueMap = new Map<string, number>();
+    const verts: number[] = []; // interleaved x,y,z,u,v
     const indices: number[] = [];
-    // Map any referenced vt to the corresponding vertex
+
     for (const f of faces) {
-      indices.push(f.vi);
-      if (f.vti !== undefined && rawTexcoords.length >= (f.vti + 1) * 2) {
-        texcoordsPerVertex[f.vi * 2 + 0] = rawTexcoords[f.vti * 2 + 0];
-        texcoordsPerVertex[f.vi * 2 + 1] = rawTexcoords[f.vti * 2 + 1];
+      const key = `${f.vi}/${f.vti !== undefined ? f.vti : -1}/${f.vni !== undefined ? f.vni : -1}`;
+      let idx = uniqueMap.get(key);
+      if (idx === undefined) {
+        // create new vertex
+        const px = positions[f.vi * 3 + 0];
+        const py = positions[f.vi * 3 + 1];
+        const pz = positions[f.vi * 3 + 2];
+        let u = 0;
+        let v = 0;
+        if (f.vti !== undefined && rawTexcoords.length >= (f.vti + 1) * 2) {
+          u = rawTexcoords[f.vti * 2 + 0];
+          v = rawTexcoords[f.vti * 2 + 1];
+        }
+        verts.push(px, py, pz, u, v);
+        idx = verts.length / 5 - 1;
+        uniqueMap.set(key, idx);
       }
+      indices.push(idx);
     }
 
     return {
-      positions: new Float32Array(positions),
-      texcoords: texcoordsPerVertex,
+      vertices: new Float32Array(verts),
+      texcoords: new Float32Array([]),
       normals: new Float32Array(normals),
       indices: new Uint32Array(indices),
     };

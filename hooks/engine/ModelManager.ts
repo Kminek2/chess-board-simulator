@@ -2,6 +2,7 @@ import { ExpoWebGLRenderingContext } from "expo-gl";
 import Model from "./Model";
 import { assetContents } from "@/generated/assetMap";
 import TextureManager from "./Texture";
+import Logger from "@/hooks/helpers/logger";
 
 type LoadedModel = {
   vertStart: number; // vertex_data_start
@@ -68,7 +69,7 @@ export default class ModelManager {
     } catch (err) {
       console.warn("ModelManager: failed to preload models:", err);
     }
-    console.log("ModelManager: loaded models:", Array.from(this._loaded_models.keys()));
+  Logger.info("ModelManager: loaded models:", Array.from(this._loaded_models.keys()));
   }
 
   // Expose buffers so rendering code can bind them before setting attrib pointers
@@ -99,31 +100,29 @@ export default class ModelManager {
       this._recreate_ind_buffer();
       return;
     }
+    const vertsToAdd = model.getVertices();
+    const indsToAdd = model.getIndices();
 
-    const m_ind = model.getIndices();
+    // Record starting offsets in floats/elements
+    const vert_start = this._vertices.length; // in floats
+    const ind_start = this._indices.length; // in elements
 
-    this._addToVertex(model.getVertices());
-    this._addToEbo(m_ind);
-
-    const vert_start = this._vertices.length;
-    const n_vert = new Float32Array(
-      this._vertices.length + model.getVertices().length
-    );
+    // Append to CPU-side arrays first
+    const n_vert = new Float32Array(this._vertices.length + vertsToAdd.length);
     n_vert.set(this._vertices, 0);
-    n_vert.set(model.getVertices(), this._vertices.length);
+    n_vert.set(vertsToAdd, this._vertices.length);
     this._vertices = n_vert;
 
-    const ind_start = this._indices.length;
-    const n_ind = new Uint32Array(this._indices.length + m_ind.length);
+    const n_ind = new Uint32Array(this._indices.length + indsToAdd.length);
     n_ind.set(this._indices, 0);
-    n_ind.set(m_ind, this._indices.length);
+    n_ind.set(indsToAdd, this._indices.length);
     this._indices = n_ind;
 
     this._loaded_models.set(model.name, {
       vertStart: vert_start,
-      vertSize: this._vertices.length - vert_start,
+      vertSize: vertsToAdd.length,
       indStart: ind_start,
-      indSize: this._indices.length - ind_start,
+      indSize: indsToAdd.length,
       instanceCount: initialInstanceCount,
       instanceOffset: 0,
       indexBufferStart: 0,
@@ -177,11 +176,11 @@ export default class ModelManager {
       this._recreateVao(vertices.length);
     }
 
-    this._gl.bindBuffer(this._gl.ARRAY_BUFFER, this._vbo);
-    this._gl.bufferSubData(this._gl.ARRAY_BUFFER, this._vbo_used * 4, vertices);
+  this._gl.bindBuffer(this._gl.ARRAY_BUFFER, this._vbo);
+  this._gl.bufferSubData(this._gl.ARRAY_BUFFER, this._vbo_used * 4, vertices);
 
-    this._vbo_used += vertices.length;
-    console.log(vertices.length);
+  this._vbo_used += vertices.length;
+  Logger.debug("ModelManager._addToVertex: uploaded", vertices.length, "floats");
   }
 
   private static _recreateVao(extra_size: number) {
@@ -243,8 +242,8 @@ export default class ModelManager {
   private static _recreate_ind_buffer() {
     let n_ind = new Array<number>();
     this._loaded_models.forEach((v, k) => {
-      const a = this._indices.slice(v.indStart, v.indStart + v.indSize);
-      const b = new Array<number>(...a);
+  const a = this._indices.slice(v.indStart, v.indStart + v.indSize);
+  const b = Array.from(a);
 
       const model_data = this._loaded_models.get(k);
       if (model_data == undefined) throw Error("Error updating buffer");
@@ -284,10 +283,10 @@ export default class ModelManager {
   public static addInstanceByName(name: string, count: number = 1) {
     const model_data = this._loaded_models.get(name);
     if (model_data == undefined) throw Error(`Model ${name} not registered`);
-    console.log(`ModelManager.addInstanceByName: before=${model_data.instanceCount}, add=${count}`);
+    Logger.debug(`ModelManager.addInstanceByName: before=${model_data.instanceCount}, add=${count}`);
     model_data.instanceCount += count;
     this._updateIds();
     this._recreate_ind_buffer();
-    console.log(`ModelManager.addInstanceByName: after=${model_data.instanceCount}`);
+    Logger.debug(`ModelManager.addInstanceByName: after=${model_data.instanceCount}`);
   }
 }

@@ -4,6 +4,8 @@ attribute float a_instanceID;
 
 uniform sampler2D u_transformsTex;
 uniform float u_numInstances;
+uniform int u_transformsAreBytes; // 0 = floats, 1 = packed unsigned bytes
+uniform float u_transformScale; // scale used when packing floats into bytes
 
 // Camera matrices
 uniform mat4 u_view;
@@ -17,12 +19,24 @@ uniform vec2 u_atlasSize; // in pixels
 varying vec2 v_uv;
 
 mat4 getMatrix(float id) {
-    float v = (id + 0.5) / u_numInstances;
-    vec4 r0 = texture2D(u_transformsTex, vec2(0.125, v));
-    vec4 r1 = texture2D(u_transformsTex, vec2(0.375, v));
-    vec4 r2 = texture2D(u_transformsTex, vec2(0.625, v));
-    vec4 r3 = texture2D(u_transformsTex, vec2(0.875, v));
-    return mat4(r0, r1, r2, r3);
+  // If number of instances is zero (or unsupported), return identity matrix.
+  if (u_numInstances <= 0.5) {
+    return mat4(1.0);
+  }
+  float v = (id + 0.5) / u_numInstances;
+  vec4 r0 = texture2D(u_transformsTex, vec2(0.125, v));
+  vec4 r1 = texture2D(u_transformsTex, vec2(0.375, v));
+  vec4 r2 = texture2D(u_transformsTex, vec2(0.625, v));
+  vec4 r3 = texture2D(u_transformsTex, vec2(0.875, v));
+  if (u_transformsAreBytes == 1) {
+    // decode normalized bytes back into floats in range [-u_transformScale, u_transformScale]
+    vec4 d0 = (r0 * 2.0 - 1.0) * u_transformScale;
+    vec4 d1 = (r1 * 2.0 - 1.0) * u_transformScale;
+    vec4 d2 = (r2 * 2.0 - 1.0) * u_transformScale;
+    vec4 d3 = (r3 * 2.0 - 1.0) * u_transformScale;
+    return mat4(d0, d1, d2, d3);
+  }
+  return mat4(r0, r1, r2, r3);
 }
 
 void main() {
