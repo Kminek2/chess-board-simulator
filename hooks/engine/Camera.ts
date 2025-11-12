@@ -10,6 +10,7 @@ export default class Camera {
   private static readonly DEFAULT_ASPECT = 16 / 9;
   private static readonly DEFAULT_NEAR = 0.1;
   private static readonly DEFAULT_FAR = 1000;
+  public static ASPECT_RATIO = this.DEFAULT_ASPECT;
 
   private _transform: Transform = new Transform();
 
@@ -18,15 +19,24 @@ export default class Camera {
   private _camera_type: "perspective" | "orthographic" = "perspective";
 
   private static _main: Camera | null = null;
-  constructor(fov?: number, aspect?: number, near?: number, far?: number) {
+  constructor(fov?: number, aspect?: number, near?: number, far?: number, transform?: Transform, camera_type: "perspective" | "orthographic" = "perspective") {
     this._fov = fov ? fov : Camera.DEFAULT_FOV;
-    this._aspect = aspect ? aspect : Camera.DEFAULT_ASPECT;
+    this._aspect = aspect ? aspect : Camera.ASPECT_RATIO;
     this._near = near ? near : Camera.DEFAULT_NEAR;
     this._far = far ? far : Camera.DEFAULT_FAR;
+    this._camera_type = camera_type;
 
     if (Camera._main === null) {
       Camera._main = this;
     }
+
+    if (transform) {
+      this._transform = transform;
+    }
+  }
+
+  public static set aspect_ratio(ratio: number) {
+    Camera.ASPECT_RATIO = ratio;
   }
 
   private get _viewMatrix() {

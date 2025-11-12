@@ -289,4 +289,18 @@ export default class ModelManager {
     this._recreate_ind_buffer();
     Logger.debug(`ModelManager.addInstanceByName: after=${model_data.instanceCount}`);
   }
+
+
+  public static deleteInstanceByName(name: string, count: number = 1) {
+    const model_data = this._loaded_models.get(name);
+    if (model_data == undefined) throw Error(`Model ${name} not registered`);
+    if (model_data.instanceCount < count) {
+      throw Error(`ModelManager.deleteInstanceByName: cannot delete ${count} instances from model ${name} with only ${model_data.instanceCount} instances`);
+    }
+    Logger.debug(`ModelManager.deleteInstanceByName: before=${model_data.instanceCount}, delete=${count}`);
+    model_data.instanceCount -= count;
+    this._updateIds();
+    this._recreate_ind_buffer();
+    Logger.debug(`ModelManager.deleteInstanceByName: after=${model_data.instanceCount}`);
+  }
 }

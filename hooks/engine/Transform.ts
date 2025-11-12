@@ -12,7 +12,7 @@ export default class Transform {
     private _updates: boolean = true;
     private _mat: Matrix4 = new Matrix4();
 
-    constructor(pos = new Vector3(), rot = new Vector3(), scale = new Vector3()){
+    constructor(pos = new Vector3(), rot = new Vector3(), scale = new Vector3(1, 1, 1)){
         this._pos = pos;
         this._rot = new Vector3(radians(rot));
         this._scale = scale;

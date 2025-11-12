@@ -1,6 +1,16 @@
+import GameObj from "./GameObj"
+
 export default abstract class ObjectScript{
-    public abstract init(): void;
-    public abstract earlyUpdate(): void;
-    public abstract update(): void;
-    public abstract lateUpdate(): void;
+    private _game_obj: GameObj | null = null;
+
+    constructor(game_obj: GameObj){
+        this._game_obj = game_obj;
+        game_obj.addScript(this);
+        this.init();
+    }
+
+    public init(): void {};
+    public earlyUpdate(): void {};
+    public update(): void {};
+    public lateUpdate(): void {};
 }

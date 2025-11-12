@@ -27,6 +27,17 @@ export default class DataManager {
     this._objects.get(obj.model_name)?.push(obj);
   }
 
+  public static deleteObj(obj: GameObj) {
+    if (!this._objects.has(obj.model_name)) {
+      Logger.warn(`DataManager: attempted to delete object of model ${obj.model_name} which is not registered`);
+      return;
+    }
+    this._objects.get(obj.model_name)?.splice(
+      this._objects.get(obj.model_name)!.indexOf(obj),
+      1
+    );
+  }
+
   public static init(gl: ExpoWebGLRenderingContext) {
     this._gl = gl;
     gl.getExtension("OES_texture_float");

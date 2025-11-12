@@ -3,9 +3,13 @@ import DataManager from "@/hooks/engine/DataManager";
 import GameObj from "@/hooks/engine/GameObj";
 import Model from "@/hooks/engine/Model";
 import ModelManager from "@/hooks/engine/ModelManager";
+import Scene from "@/hooks/engine/Scene";
 import { Shader } from "@/hooks/engine/Shader";
 import TextureManager from "@/hooks/engine/Texture";
+import Time from "@/hooks/engine/Time";
 import Transform from "@/hooks/engine/Transform";
+import DefaultScene from "@/hooks/game/DefaultScene";
+import Logger from "@/hooks/helpers/logger";
 import { ExpoWebGLRenderingContext, GLView } from "expo-gl";
 import { Vector3 } from "math.gl";
 import React, { useEffect, useRef, useState } from "react";
@@ -81,18 +85,6 @@ export default function App() {
       console.log("App: about to DataManager.init");
       DataManager.init(gl);
       console.log("App: done DataManager.init");
-      const obj = new GameObj(
-        new Model("cube-test"),
-        new Transform(
-          new Vector3(0, 0, -0.5),
-          new Vector3(),
-          new Vector3(1, 1, 1)
-        )
-      );
-      console.log(
-        "After creating GameObj, instance count =",
-        ModelManager.getInstanceCount("cube-test")
-      );
 
       // Bind attributes (interleaved vertex: x,y,z,u,v) -> stride = 5 * 4
       const position_loc = gl.getAttribLocation(program, "a_position");
@@ -103,20 +95,11 @@ export default function App() {
       const u_view_loc = gl.getUniformLocation(program, "u_view");
       const u_proj_loc = gl.getUniformLocation(program, "u_projection");
 
-  // Reusable buffers for camera matrices to avoid allocating Float32Array each frame
-  const _cameraViewBuf = new Float32Array(16);
-  const _cameraProjBuf = new Float32Array(16);
+      // Reusable buffers for camera matrices to avoid allocating Float32Array each frame
+      const _cameraViewBuf = new Float32Array(16);
+      const _cameraProjBuf = new Float32Array(16);
 
-      // Create and register a main camera
-      const cam = new Camera(
-        60,
-        gl.drawingBufferWidth / gl.drawingBufferHeight,
-        0.1,
-        1000
-      );
-      // position camera a bit back so unit cube is visible
-      cam.transform.pos = new Vector3(0, 0, 0);
-      cam.transform.rot = new Vector3(0, 0, 0);
+      Camera.ASPECT_RATIO = gl.drawingBufferWidth / gl.drawingBufferHeight;
 
       const VERT_STRIDE = 5 * 4; // bytes
 
@@ -140,10 +123,16 @@ export default function App() {
       gl.bindBuffer(gl.ARRAY_BUFFER, ModelManager.getVBOIDs());
       gl.vertexAttribPointer(id_loc, 1, gl.FLOAT, false, 1 * 4, 0);
 
-      let angle = 0.1;
+      Scene.active_scene = new DefaultScene();
+
+      Time.updateDeltaTime();
 
       function render() {
-        angle += 0.02;
+        Time.updateDeltaTime();
+
+        Scene.EarlyUpdate();
+        Scene.Update();
+        Scene.LateUpdate();
 
         gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
         gl.clearColor(0, 0, 0, 1);
@@ -152,8 +141,6 @@ export default function App() {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         DataManager.updateBuffers(program);
-
-        Camera.main.transform.move(new Vector3(0, 0, -0.1));
 
         // Upload camera matrices each frame (as plain uniforms)
         if (u_view_loc) {
@@ -183,8 +170,6 @@ export default function App() {
           fpsRef.current.frames = 0;
           fpsRef.current.lastTime = now;
         }
-
-        obj.transform.rotate(new Vector3(0, angle, 0));
 
         DataManager.objects.forEach((v, k) => {
           // Minimal per-model logging to avoid flooding Metro output
