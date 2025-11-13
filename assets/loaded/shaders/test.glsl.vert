@@ -17,6 +17,7 @@ uniform vec2 u_texSize; // in pixels
 uniform vec2 u_atlasSize; // in pixels
 
 varying vec2 v_uv;
+varying vec3 v_pos;
 
 mat4 getMatrix(float id) {
   // If number of instances is zero (or unsupported), return identity matrix.
@@ -43,6 +44,9 @@ void main() {
   mat4 model = getMatrix(a_instanceID);
   // Apply camera view/projection
   gl_Position = u_projection * u_view * model * vec4(a_position, 1.0);
+
+  // expose position in world space to fragment shader for debug coloring
+  v_pos = (model * vec4(a_position, 1.0)).xyz;
 
   // remap local texcoord (0..1) into atlas pixel space and then to atlas UVs
   vec2 uv_pixels = a_texcoord * u_texSize + u_texOffset;

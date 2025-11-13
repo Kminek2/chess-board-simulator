@@ -6,9 +6,9 @@ const projectRoot = path.join(__dirname, "..");
 const assetsRoot = path.join(projectRoot, "assets", "loaded"); // adjust if needed
 const outputFile = path.join(projectRoot, "generated", "assetMap.ts");
 
-// file extensions to include (text-based + images)
+// file extensions to include (text-based, binary like .glb, and images)
 const INCLUDE_RE =
-  /\.(vert|frag|glsl|vs|fs|txt|json|cfg|shader|wgsl|glslfrag|glslvert|obj|png|jpe?g)$/i;
+  /\.(vert|frag|glsl|vs|fs|txt|json|cfg|shader|wgsl|glslfrag|glslvert|obj|gltf|glb|png|jpe?g)$/i;
 
 function walk(dir) {
   let results = [];
@@ -51,7 +51,8 @@ for (const file of files) {
   const key = path.relative(assetsRoot, file).replace(/\\/g, "/");
   const ext = path.extname(file).toLowerCase();
   let esc;
-  if (ext === ".png" || ext === ".jpg" || ext === ".jpeg") {
+  // Treat glb and image files as binary (base64 embed). Textual glTF (.gltf) stays as JSON text.
+  if (ext === ".png" || ext === ".jpg" || ext === ".jpeg" || ext === ".glb") {
     // read binary and store base64 string (no data URI prefix)
     const bin = fs.readFileSync(file);
     esc = JSON.stringify(bin.toString("base64"));

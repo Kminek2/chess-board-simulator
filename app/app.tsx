@@ -53,6 +53,7 @@ export default function App() {
   async function onContextCreate(gl: ExpoWebGLRenderingContext) {
     try {
       const ext = gl.getExtension("OES_element_index_uint");
+      const instExt = gl.getExtension("ANGLE_instanced_arrays");
 
       if (ext == null) {
         throw new Error(
@@ -65,6 +66,16 @@ export default function App() {
       const program = await createProgram(gl, vertex_shader, fragment_shader);
 
       gl.useProgram(program);
+
+      // Debug: toggle coloring by world-space position instead of sampling the atlas.
+      // Set this to `true` to quickly verify geometry independent of textures/UVs.
+      const DEBUG_COLOR_BY_POS = true;
+      try {
+        const dbgLoc = gl.getUniformLocation(program, "u_debugColorByPos");
+        if (dbgLoc) gl.uniform1i(dbgLoc, DEBUG_COLOR_BY_POS ? 1 : 0);
+      } catch (err) {
+        console.warn("App: failed to set debug uniform u_debugColorByPos", err);
+      }
 
       // Enable depth testing so closer fragments occlude farther ones
       gl.enable(gl.DEPTH_TEST);
@@ -107,6 +118,20 @@ export default function App() {
       gl.enableVertexAttribArray(texcoord_loc);
       gl.enableVertexAttribArray(id_loc);
 
+      // Lightweight attribute diagnostics: ensure attributes exist and stride is as expected
+      try {
+        if (position_loc < 0 || texcoord_loc < 0) {
+          Logger.warn(
+            "App: missing shader attribute(s)",
+            { position_loc, texcoord_loc, id_loc }
+          );
+        } else {
+          Logger.info("App: attrib locations", { position_loc, texcoord_loc, id_loc, VERT_STRIDE });
+        }
+      } catch (err) {
+        console.warn("App: attribute diagnostic failed", err);
+      }
+
       // Default binding to start of vertex buffer; per-model we will rebind with offsets
       gl.bindBuffer(gl.ARRAY_BUFFER, ModelManager.getVBO());
       gl.vertexAttribPointer(position_loc, 3, gl.FLOAT, false, VERT_STRIDE, 0);
@@ -122,6 +147,10 @@ export default function App() {
       // ID attribute uses separate buffer (VBOIDs)
       gl.bindBuffer(gl.ARRAY_BUFFER, ModelManager.getVBOIDs());
       gl.vertexAttribPointer(id_loc, 1, gl.FLOAT, false, 1 * 4, 0);
+      // If instancing is supported, mark the ID attribute as per-instance
+      if (instExt) {
+        (instExt as any).vertexAttribDivisorANGLE(id_loc, 1);
+      }
 
       Scene.active_scene = new DefaultScene();
 
@@ -171,7 +200,7 @@ export default function App() {
           fpsRef.current.lastTime = now;
         }
 
-        DataManager.objects.forEach((v, k) => {
+  DataManager.objects.forEach((v, k) => {
           // Minimal per-model logging to avoid flooding Metro output
           // console.log(k);
           // console.log(v);
@@ -210,6 +239,10 @@ export default function App() {
             1 * 4,
             modelData.instanceOffset * 4
           );
+          // Ensure divisor is set for this attribute if instancing is available
+          if (instExt) {
+            (instExt as any).vertexAttribDivisorANGLE(id_loc, 1);
+          }
 
           // Debug info (commented out to reduce log noise). Enable if necessary:
           // console.log("----- App logs ------");
@@ -217,29 +250,64 @@ export default function App() {
           // console.log(ModelManager.getInstanceCount(k));
           // console.log(ModelManager.getInstanceOffset(k));
 
-          // Bind atlas and set atlas uniforms for this model
-          const meta = (TextureManager as any).getMeta(k);
-          const atlasSize = TextureManager.getAtlasSize();
-          // bind atlas to texture unit 1
+          // Bind atlas once
           TextureManager.bindAtlas(gl, 1);
           const u_atlas_loc = gl.getUniformLocation(program, "u_atlas");
           if (u_atlas_loc) gl.uniform1i(u_atlas_loc, 1);
           const u_texOffset = gl.getUniformLocation(program, "u_texOffset");
           const u_texSize = gl.getUniformLocation(program, "u_texSize");
           const u_atlasSize = gl.getUniformLocation(program, "u_atlasSize");
-          if (u_texOffset) gl.uniform2f(u_texOffset, meta.x, meta.y);
-          if (u_texSize) gl.uniform2f(u_texSize, meta.width, meta.height);
-          if (u_atlasSize)
-            gl.uniform2f(u_atlasSize, atlasSize.width, atlasSize.height);
 
-          // Ensure EBO is bound; drawElements offset is in bytes
-          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ModelManager.getEBO());
-          gl.drawElements(
-            gl.TRIANGLES,
-            ModelManager.getIndicesLength(k) * ModelManager.getInstanceCount(k),
-            gl.UNSIGNED_INT,
-            ModelManager.getInstanceOffset(k) * 4
-          );
+          // Draw per-material draw ranges (if model has multiple textures/materials)
+          const drawRanges = modelData!.drawRanges && modelData!.drawRanges.length > 0
+            ? modelData!.drawRanges
+            : [{ start: 0, count: modelData!.indSize, material: k }];
+
+          // Bind appropriate EBO depending on whether we can use instanced draws
+          if (instExt) {
+            // base EBO (non-duplicated indices) for instanced draw
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ModelManager.getEBO());
+          } else {
+            // duplicated (instanced) index buffer fallback
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ModelManager.getInstancedEBO());
+          }
+
+          for (const range of drawRanges) {
+            const meta = (TextureManager as any).getMeta(range.material);
+            const atlasSize = TextureManager.getAtlasSize();
+            // One-shot diagnostic: log atlas/meta for the 'store' model to verify pixel-space values
+            try {
+              if (k === "store") {
+                // log once per session to avoid spam
+                if (!(global as any).__loggedAtlasMeta) {
+                  (global as any).__loggedAtlasMeta = true;
+                  Logger.info("App: atlas/meta for model 'store'", { meta, atlasSize });
+                }
+              }
+            } catch (err) {
+              Logger.warn("App: failed to log atlas/meta", err);
+            }
+            if (u_texOffset) gl.uniform2f(u_texOffset, meta.x, meta.y);
+            if (u_texSize) gl.uniform2f(u_texSize, meta.width, meta.height);
+            if (u_atlasSize) gl.uniform2f(u_atlasSize, atlasSize.width, atlasSize.height);
+
+            if (instExt) {
+              // Use instanced draw: draw the primitive index block once, repeated by instanceCount
+              const offsetBytes = (modelData.indStart + range.start) * 4;
+              (instExt as any).drawElementsInstancedANGLE(
+                gl.TRIANGLES,
+                range.count,
+                gl.UNSIGNED_INT,
+                offsetBytes,
+                ModelManager.getInstanceCount(k)
+              );
+            } else {
+              // Fallback: EBO contains duplicated indices per-instance; draw all at once
+              const count = range.count * ModelManager.getInstanceCount(k);
+              const offsetBytes = (modelData.indexBufferStart + range.start) * 4;
+              gl.drawElements(gl.TRIANGLES, count, gl.UNSIGNED_INT, offsetBytes);
+            }
+          }
         });
 
         gl.endFrameEXP(); // Important: tells GLView to display the frame

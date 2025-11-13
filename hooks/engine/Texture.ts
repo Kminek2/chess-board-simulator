@@ -26,6 +26,20 @@ export default class TextureManager {
     }
   }
 
+  // Register an image provided as a raw binary buffer (e.g. from a GLB's image bufferView)
+  // buffer should be a Uint8Array containing the original image file (PNG/JPEG). We store
+  // it to be considered when building the atlas in init().
+  private static _inlineImages: Map<string, { data: Uint8Array; mime?: string }> = new Map();
+
+  public static registerTextureFromBuffer(name: string, data: Uint8Array, mime?: string) {
+    this._inlineImages.set(name, { data, mime });
+    // Also set a placeholder meta so callers can query it before init
+    if (!this._registered.has(name)) {
+      this._registered.set(name, { name, x: 0, y: 0, width: 1, height: 1 });
+    }
+    Logger.debug(`TextureManager.registerTextureFromBuffer: registered inline image ${name} mime=${mime}`);
+  }
+
   // Build a simple horizontal atlas if PNG/JPG base64 data is present in generated assetContents (web-friendly).
   public static async init(gl: ExpoWebGLRenderingContext) {
     this._atlasTex = gl.createTexture();
@@ -44,6 +58,28 @@ export default class TextureManager {
       rgba: Uint8Array;
     }[] = [];
     for (const [name] of this._registered) {
+      // Priority: inline buffer registered at runtime (e.g. GLB images), then generated embedded assets
+      const inline = this._inlineImages.get(name);
+      if (inline) {
+        try {
+          const ab = inline.data.buffer.slice(inline.data.byteOffset, inline.data.byteOffset + inline.data.byteLength);
+          const dec = UPNG.decode(ab as any);
+          const rgbaResult = UPNG.toRGBA8(dec as any);
+          let rgba: Uint8Array | undefined;
+          if (Array.isArray(rgbaResult)) rgba = new Uint8Array(rgbaResult[0] as any);
+          else if (rgbaResult instanceof Uint8Array) rgba = rgbaResult;
+          else if (rgbaResult instanceof ArrayBuffer) rgba = new Uint8Array(rgbaResult);
+          if (!rgba) {
+            Logger.warn(`TextureManager: UPNG.toRGBA8 returned unexpected result for inline ${name}`);
+          } else {
+            imgs.push({ name, width: dec.width, height: dec.height, rgba });
+            continue;
+          }
+        } catch (err) {
+          Logger.warn(`TextureManager: failed to decode inline image for ${name}:`, err);
+        }
+      }
+
       const pngKey = `textures/${name}.png`;
       const data = (assetContents as any)[pngKey];
       if (!data) {
