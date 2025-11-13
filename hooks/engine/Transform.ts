@@ -73,6 +73,15 @@ export default class Transform {
         return new Vector3(degrees(this._rot));
     }
 
+    public lookAt(target: Vector3){
+        const direction = target.subtract(this._pos).normalize();
+        const pitch = Math.asin(direction.y);
+        const yaw = Math.atan2(direction.z, direction.x);
+        this._rot = new Vector3(-pitch, yaw, 0);
+        this._update_front();
+        this._updates = true;
+    }
+
     public set rot(new_rot: Vector3){
         this._rot = new Vector3(radians(new_rot));
         this._updates = true;
