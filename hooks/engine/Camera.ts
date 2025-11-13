@@ -19,7 +19,14 @@ export default class Camera {
   private _camera_type: "perspective" | "orthographic" = "perspective";
 
   private static _main: Camera | null = null;
-  constructor(fov?: number, aspect?: number, near?: number, far?: number, transform?: Transform, camera_type: "perspective" | "orthographic" = "perspective") {
+  constructor(
+    fov?: number,
+    aspect?: number,
+    near?: number,
+    far?: number,
+    transform?: Transform,
+    camera_type: "perspective" | "orthographic" = "perspective"
+  ) {
     this._fov = fov ? fov : Camera.DEFAULT_FOV;
     this._aspect = aspect ? aspect : Camera.ASPECT_RATIO;
     this._near = near ? near : Camera.DEFAULT_NEAR;
@@ -48,9 +55,9 @@ export default class Camera {
     // Compute forward direction from yaw/pitch
     const cp = Math.cos(pitch);
     const forward = new Vector3(
-      Math.sin(yaw) * cp,
+      Math.cos(yaw) * cp,
       Math.sin(pitch),
-      Math.cos(yaw) * cp
+      Math.sin(yaw) * cp
     );
 
     const eye = this.transform.pos.toArray
