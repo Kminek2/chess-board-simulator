@@ -1,0 +1,158 @@
+# Blender 3.6.4 MTL File: 'RetroPc_Chess(b3_6).blend'
+# www.blender.org
+
+newmtl bishop_b_mat
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/bishop_b_mat_BaseColor.jpg
+map_Ns C:/bishop_b_mat_Roughness.jpg
+map_refl C:/bishop_b_mat_Metallic.jpg
+map_Bump -bm 1.000000 C:/bishop_b_mat_Normal.png
+
+newmtl bishop_w_mat
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/bishop_w_mat_BaseColor.jpg
+map_Ns C:/bishop_w_mat_Roughness.jpg
+map_refl C:/bishop_w_mat_Metallic.jpg
+map_Bump -bm 1.000000 C:/bishop_w_mat_Normal.png
+
+newmtl board_mat
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/board_mat_BaseColor.jpg
+map_Ns C:/board_mat_Roughness.jpg
+map_refl C:/board_mat_Metallic.jpg
+map_Bump -bm 1.000000 C:/board_mat_Normal.png
+
+newmtl king_b_mat
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/king_b_mat_BaseColor.jpg
+map_Ns C:/king_b_mat_Roughness.jpg
+map_refl C:/king_b_mat_Metallic.jpg
+map_Ke C:/king_b_mat_Emissive.jpg
+map_Bump -bm 1.000000 C:/king_b_mat_Normal.png
+
+newmtl king_w_mat
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/king_w_mat_BaseColor.jpg
+map_Ns C:/king_w_mat_Roughness.jpg
+map_refl C:/king_w_mat_Metallic.jpg
+map_Ke C:/king_w_mat_Emissive.jpg
+map_Bump -bm 1.000000 C:/king_w_mat_Normal.png
+
+newmtl knight_b_mat
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/knight_b_mat_BaseColor.jpg
+map_Ns C:/knight_b_mat_Roughness.jpg
+map_refl C:/knight_b_mat_Metallic.jpg
+map_Bump -bm 1.000000 C:/knight_b_mat_Normal.png
+
+newmtl knight_w_mat
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/knight_w_mat_BaseColor.jpg
+map_Ns C:/knight_w_mat_Roughness.jpg
+map_refl C:/knight_w_mat_Metallic.jpg
+map_Bump -bm 1.000000 C:/knight_w_mat_Normal.png
+
+newmtl pawb_b_mat
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd C:/pawb_b_mat_BaseColor.jpg
+map_Ns C:/pawb_b_mat_Roughness.jpg
+map_refl C:/pawb_b_mat_Metallic.jpg
+map_d C:/pawb_b_mat_Alpha.jpg
+map_Bump -bm 1.000000 C:/pawb_b_mat_Normal.png
+
+newmtl pawb_w_mat
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd C:/pawb_w_mat_BaseColor.jpg
+map_Ns C:/pawb_w_mat_Roughness.jpg
+map_refl C:/pawb_w_mat_Metallic.jpg
+map_d C:/pawb_w_mat_Alpha.jpg
+map_Bump -bm 1.000000 C:/pawb_w_mat_Normal.png
+
+newmtl queen_b_mat
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/queen_b_mat_BaseColor.jpg
+map_Ns C:/queen_b_mat_Roughness.jpg
+map_refl C:/queen_b_mat_Metallic.jpg
+map_Bump -bm 1.000000 C:/queen_b_mat_Normal.png
+
+newmtl queen_w_mat
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/queen_w_mat_BaseColor.jpg
+map_Ns C:/queen_w_mat_Roughness.jpg
+map_refl C:/queen_w_mat_Metallic.jpg
+map_Bump -bm 1.000000 C:/queen_w_mat_Normal.png
+
+newmtl rook_b_mat
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/rook_b_mat_BaseColor.jpg
+map_Ns C:/rook_b_mat_Roughness.jpg
+map_refl C:/rook_b_mat_Metallic.jpg
+map_Bump -bm 1.000000 C:/rook_b_mat_Normal.png
+
+newmtl rook_w_mat
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/rook_w_mat_BaseColor.jpg
+map_Ns C:/rook_w_mat_Roughness.jpg
+map_refl C:/rook_w_mat_Metallic.jpg
+map_Bump -bm 1.000000 C:/rook_w_mat_Normal.png

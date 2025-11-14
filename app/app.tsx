@@ -218,7 +218,6 @@ export default function App() {
           // console.log(ModelManager.getInstanceOffset(k));
 
           // Bind atlas and set atlas uniforms for this model
-          const meta = (TextureManager as any).getMeta(k);
           const atlasSize = TextureManager.getAtlasSize();
           // bind atlas to texture unit 1
           TextureManager.bindAtlas(gl, 1);
@@ -227,19 +226,40 @@ export default function App() {
           const u_texOffset = gl.getUniformLocation(program, "u_texOffset");
           const u_texSize = gl.getUniformLocation(program, "u_texSize");
           const u_atlasSize = gl.getUniformLocation(program, "u_atlasSize");
-          if (u_texOffset) gl.uniform2f(u_texOffset, meta.x, meta.y);
-          if (u_texSize) gl.uniform2f(u_texSize, meta.width, meta.height);
-          if (u_atlasSize)
-            gl.uniform2f(u_atlasSize, atlasSize.width, atlasSize.height);
 
-          // Ensure EBO is bound; drawElements offset is in bytes
+          // If model has submeshes (materials), draw each submesh separately with its own texture meta
+          const subs = ModelManager.getSubmeshes(k);
           gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ModelManager.getEBO());
-          gl.drawElements(
-            gl.TRIANGLES,
-            ModelManager.getIndicesLength(k) * ModelManager.getInstanceCount(k),
-            gl.UNSIGNED_INT,
-            ModelManager.getInstanceOffset(k) * 4
-          );
+          if (subs && subs.length > 0) {
+            for (const s of subs) {
+              const texKey = `${k}@${s.name}`;
+              const meta = (TextureManager as any).getMeta(texKey) || (TextureManager as any).getMeta(k);
+              if (u_texOffset) gl.uniform2f(u_texOffset, meta.x, meta.y);
+              if (u_texSize) gl.uniform2f(u_texSize, meta.width, meta.height);
+              if (u_atlasSize) gl.uniform2f(u_atlasSize, atlasSize.width, atlasSize.height);
+
+              const count = (s.indexBufferLength || 0);
+              // s.indexBufferStart already points to the correct byte offset (in elements) within the shared EBO
+              // multiply by 4 to convert to bytes. Do NOT add model_data.indexBufferStart again (would double-offset).
+              const offset = (s.indexBufferStart || 0) * 4;
+              if (count > 0) {
+                gl.drawElements(gl.TRIANGLES, count, gl.UNSIGNED_INT, offset);
+              }
+            }
+          } else {
+            // Ensure EBO is bound; drawElements offset is in bytes
+            const meta = (TextureManager as any).getMeta(k);
+            if (u_texOffset) gl.uniform2f(u_texOffset, meta.x, meta.y);
+            if (u_texSize) gl.uniform2f(u_texSize, meta.width, meta.height);
+            if (u_atlasSize) gl.uniform2f(u_atlasSize, atlasSize.width, atlasSize.height);
+
+            gl.drawElements(
+              gl.TRIANGLES,
+              ModelManager.getIndicesLength(k) * ModelManager.getInstanceCount(k),
+              gl.UNSIGNED_INT,
+              ModelManager.getInstanceOffset(k) * 4
+            );
+          }
         });
 
         gl.endFrameEXP(); // Important: tells GLView to display the frame

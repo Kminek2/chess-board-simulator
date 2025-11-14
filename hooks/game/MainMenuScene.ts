@@ -8,7 +8,7 @@ export default class MainMenuScene extends Scene {
   private _worldObj: GameObj | null = null;
 
   protected _init(): void {
-    new GameObj(new Model("cube-test"));
+    new GameObj(new Model("chess"));
     Camera.main.transform.pos = new Vector3(0, 10, -10);
     Camera.main.transform.lookAt(new Vector3(0, 0, 0));
   }

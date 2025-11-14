@@ -2,6 +2,7 @@ import { assetContents } from "@/generated/assetMap";
 import * as base64js from "base64-js";
 import { ExpoWebGLRenderingContext } from "expo-gl";
 import * as UPNG from "upng-js";
+import * as jpeg from "jpeg-js";
 import Logger from "@/hooks/helpers/logger";
 
 type TexMeta = {
@@ -18,11 +19,16 @@ export default class TextureManager {
   private static _atlasWidth = 1;
   private static _atlasHeight = 1;
 
-  public static registerTexture(name: string) {
+  // Register a texture name used by the renderer.
+  // Optionally provide an explicit assetKey (key inside generated assetContents)
+  // if the texture filename in assets doesn't match the logical name.
+  public static registerTexture(name: string, assetKey?: string) {
     if (!this._registered.has(name)) {
-      // placeholder until atlas is built
-      this._registered.set(name, { name, x: 0, y: 0, width: 1, height: 1 });
-      Logger.debug(`TextureManager.registerTexture: registered placeholder for ${name}`);
+      // placeholder until atlas is built. store assetKey so init() can look up the correct embedded asset.
+      const meta: TexMeta & { assetKey?: string } = { name, x: 0, y: 0, width: 1, height: 1 };
+      if (assetKey) (meta as any).assetKey = assetKey;
+      this._registered.set(name, meta as TexMeta);
+      Logger.debug(`TextureManager.registerTexture: registered placeholder for ${name} (assetKey=${assetKey || "<none>"})`);
     }
   }
 
@@ -43,48 +49,87 @@ export default class TextureManager {
       height: number;
       rgba: Uint8Array;
     }[] = [];
-    for (const [name] of this._registered) {
-      const pngKey = `textures/${name}.png`;
-      const data = (assetContents as any)[pngKey];
+    for (const [name, meta] of this._registered) {
+      // Determine which embedded asset key (if any) corresponds to this registered texture.
+      // Prefer explicit assetKey stored on registration; otherwise try a few heuristics.
+      const explicit = (meta as any).assetKey as string | undefined;
+      const possibleKeys: string[] = [];
+      if (explicit) possibleKeys.push(explicit);
+      // Default lookup: textures/<name>.(png|jpeg|jpg)
+      possibleKeys.push(`textures/${name}.png`);
+      possibleKeys.push(`textures/${name}.jpeg`);
+      possibleKeys.push(`textures/${name}.jpg`);
+      // Also try to find any embedded texture whose filename contains the registered name
+      // and some common variants (ignore separators)
+      const normalized = (s: string) => s.replace(/[_\-.\s]/g, "").toLowerCase();
+      // Only consider image assets (png/jpeg) to avoid matching obj/mtl text files
+      const assetCandidates = Object.keys(assetContents).filter((k) => {
+        if (!/\.(png|jpe?g)$/i.test(k)) return false;
+        const bn = k.replace(/.*\//, "");
+        return bn.toLowerCase().includes(name.toLowerCase()) || normalized(bn).includes(normalized(name));
+      });
+      // push candidates (prefer shorter keys first)
+      assetCandidates.sort((a, b) => a.length - b.length);
+      for (const c of assetCandidates) possibleKeys.push(c);
+
+      let data: string | undefined = undefined;
+      let foundKey: string | undefined = undefined;
+      for (const k of possibleKeys) {
+        const d = (assetContents as any)[k];
+        if (d) {
+          data = d;
+          foundKey = k;
+          break;
+        }
+      }
+
       if (!data) {
-        Logger.debug(`TextureManager.init: no embedded asset for key ${pngKey}`);
+        Logger.debug(`TextureManager.init: no embedded asset for registered texture ${name} (tried: ${possibleKeys.join(",")})`);
         continue;
       }
 
       try {
         // data is base64 string (no data: prefix) as produced by gen script
         const bin = base64js.toByteArray(data);
-        // UPNG.decode expects a tightly-sliced ArrayBuffer
         const ab = bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength);
-        const dec = UPNG.decode(ab as any);
-        const rgbaResult = UPNG.toRGBA8(dec as any);
-        // toRGBA8 may return a single Uint8Array, an ArrayBuffer, an array of frames, or an array of numbers
-        let rgba: Uint8Array | undefined;
-        const tryCoerce = (val: any): Uint8Array | undefined => {
-          if (!val) return undefined;
-          if (val instanceof Uint8Array) return val;
-          if (val instanceof ArrayBuffer) return new Uint8Array(val);
-          if (Array.isArray(val)) return new Uint8Array(val as any);
-          return undefined;
-        };
 
-        if (Array.isArray(rgbaResult)) {
-          rgba = tryCoerce(rgbaResult[0]);
+        // Choose decoder based on foundKey extension (fallback to PNG decoder)
+        const fk = foundKey ? foundKey.toLowerCase() : "";
+        if (fk.endsWith(".jpg") || fk.endsWith(".jpeg")) {
+          // jpeg-js can decode Uint8Array/ArrayBuffer
+          const decJ = jpeg.decode(ab as any, { useTArray: true });
+          if (!decJ || !decJ.data) {
+            Logger.warn(`TextureManager: jpeg-js returned no data for ${name}`);
+            continue;
+          }
+          // jpeg-js returns RGBA Uint8Array
+          imgs.push({ name, width: decJ.width, height: decJ.height, rgba: decJ.data });
         } else {
-          rgba = tryCoerce(rgbaResult);
+          // PNG (or fallback) decode via UPNG
+          const dec = UPNG.decode(ab as any);
+          const rgbaResult = UPNG.toRGBA8(dec as any);
+          let rgba: Uint8Array | undefined;
+          const tryCoerce = (val: any): Uint8Array | undefined => {
+            if (!val) return undefined;
+            if (val instanceof Uint8Array) return val;
+            if (val instanceof ArrayBuffer) return new Uint8Array(val);
+            if (Array.isArray(val)) return new Uint8Array(val as any);
+            return undefined;
+          };
+          if (Array.isArray(rgbaResult)) rgba = tryCoerce(rgbaResult[0]);
+          else rgba = tryCoerce(rgbaResult);
+          if (!rgba) {
+            Logger.warn(`TextureManager: UPNG.toRGBA8 returned unexpected result for ${name}`);
+            continue;
+          }
+          imgs.push({ name, width: dec.width, height: dec.height, rgba: rgba });
         }
 
-        if (!rgba) {
-          Logger.warn(`TextureManager: UPNG.toRGBA8 returned unexpected result for ${name}`);
-          continue;
+        // If we found a specific asset key, remember it on the registered meta so later code can use the same key
+        if (foundKey) {
+          const registered = this._registered.get(name);
+          if (registered) (registered as any).assetKey = foundKey;
         }
-
-        imgs.push({
-          name,
-          width: dec.width,
-          height: dec.height,
-          rgba: rgba,
-        });
       } catch (err) {
         Logger.warn(`TextureManager: failed to decode embedded image for ${name}:`, err);
       }
@@ -159,54 +204,90 @@ export default class TextureManager {
       return;
     }
 
-    // Simple horizontal packing: place images side-by-side
-    // Also allocate 1x1 placeholder pixels for any registered textures that were not found
+    // Pack images into rows constrained by GL_MAX_TEXTURE_SIZE to avoid creating extremely wide atlases
+    const maxTexSize = (gl.getParameter as any)(gl.MAX_TEXTURE_SIZE) || 4096;
+    const maxAtlasWidth = Math.max(256, Math.min(16384, maxTexSize));
+    Logger.info(`TextureManager: GL_MAX_TEXTURE_SIZE=${maxTexSize}, packing atlas with max width ${maxAtlasWidth}`);
+
     const registeredNames = Array.from(this._registered.keys());
     const foundNames = validImgs.map((it) => it.name);
     const missingNames = registeredNames.filter((n) => !foundNames.includes(n));
 
-    const atlasWidth = validImgs.reduce((s, it) => s + it.width, 0) + missingNames.length * 1;
-    const atlasHeight = Math.max(1, ...validImgs.map((it) => it.height));
+    // Build rows: fill each row until adding the next image would exceed maxAtlasWidth
+    type Row = { items: typeof validImgs; width: number; height: number };
+    const rows: Array<{ items: typeof validImgs; width: number; height: number }> = [];
+    let curRowItems: typeof validImgs = [];
+    let curRowW = 0;
+    let curRowH = 0;
+    for (const it of validImgs) {
+      if (it.width > maxAtlasWidth) {
+        Logger.warn(`TextureManager: image ${it.name} width ${it.width} exceeds max texture size ${maxAtlasWidth}, skipping and reserving placeholder`);
+        // mark as missing by not including it
+        continue;
+      }
+      if (curRowW + it.width > maxAtlasWidth && curRowItems.length > 0) {
+        rows.push({ items: curRowItems, width: curRowW, height: curRowH });
+        curRowItems = [];
+        curRowW = 0;
+        curRowH = 0;
+      }
+      curRowItems.push(it);
+      curRowW += it.width;
+      curRowH = Math.max(curRowH, it.height);
+    }
+    if (curRowItems.length > 0) rows.push({ items: curRowItems, width: curRowW, height: curRowH });
+
+    const atlasWidth = Math.max(1, ...rows.map((r) => r.width));
+    const atlasHeight = rows.reduce((s, r) => s + r.height, 0) + Math.max(0, missingNames.length); // add at least 1px per missing
 
     // Create RGBA buffer for atlas and blit each image into it
     const atlasPixels = new Uint8Array(atlasWidth * atlasHeight * 4);
     atlasPixels.fill(0);
-    let xOff = 0;
 
-    // Blit valid images
-    for (const it of validImgs) {
-      for (let row = 0; row < it.height; row++) {
-        const srcStart = row * it.width * 4;
-        const dstStart = (row * atlasWidth + xOff) * 4;
-        atlasPixels.set(it.rgba.subarray(srcStart, srcStart + it.width * 4), dstStart);
+    let yOff = 0;
+    for (const row of rows) {
+      let xOff = 0;
+      for (const it of row.items) {
+        for (let rowIdx = 0; rowIdx < it.height; rowIdx++) {
+          const srcStart = rowIdx * it.width * 4;
+          const dstStart = ((yOff + rowIdx) * atlasWidth + xOff) * 4;
+          atlasPixels.set(it.rgba.subarray(srcStart, srcStart + it.width * 4), dstStart);
+        }
+        this._registered.set(it.name, {
+          name: it.name,
+          x: xOff,
+          y: yOff,
+          width: it.width,
+          height: it.height,
+        });
+        xOff += it.width;
       }
-      this._registered.set(it.name, {
-        name: it.name,
-        x: xOff,
-        y: 0,
-        width: it.width,
-        height: it.height,
-      });
-      xOff += it.width;
+      yOff += row.height;
     }
 
     // Reserve a dedicated 1x1 white pixel per-missing texture so placeholders don't overlap real images
-      if (missingNames.length > 0) {
+    if (missingNames.length > 0) {
       const white = new Uint8Array([255, 255, 255, 255]);
       for (const name of missingNames) {
-        // place white pixel at (xOff, 0)
-        const dstStart = (0 * atlasWidth + xOff) * 4;
+        const dstStart = (yOff * atlasWidth + 0) * 4; // place at start of a new row
         atlasPixels.set(white, dstStart);
         this._registered.set(name, {
           name,
-          x: xOff,
-          y: 0,
+          x: 0,
+          y: yOff,
           width: 1,
           height: 1,
         });
-        xOff += 1;
+        yOff += 1;
       }
       Logger.debug(`TextureManager: reserved ${missingNames.length} placeholder pixel(s) for missing textures: ${missingNames.join(", ")}`);
+    }
+
+    // Ensure proper unpack alignment for arbitrary widths
+    try {
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    } catch (e) {
+      // pixelStorei may not be available or necessary on all platforms; ignore errors
     }
 
     gl.texImage2D(

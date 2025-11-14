@@ -15,6 +15,16 @@ type LoadedModel = {
   indexBufferLength: number; // index_buffer_end (length of this model's instanced index chunk)
 };
 
+type Submesh = {
+  name: string;
+  vertStart: number;
+  vertSize: number;
+  indStart: number;
+  indSize: number;
+  indexBufferStart?: number;
+  indexBufferLength?: number;
+};
+
 export default class ModelManager {
   private static _vertices: Float32Array = new Float32Array([]);
   private static _indices: Uint32Array = new Uint32Array([]);
@@ -24,6 +34,7 @@ export default class ModelManager {
     string,
     LoadedModel
   >();
+  private static _model_submeshes: Map<string, Submesh[]> = new Map();
 
   private static _MIN_VBO = 256;
   private static _MIN_EBO = 126;
@@ -129,8 +140,31 @@ export default class ModelManager {
       indexBufferLength: 0,
     });
 
-    // Register texture for this model (texture file name = model name)
-    TextureManager.registerTexture(model.name);
+  // Register texture for this model (texture file name = model name)
+  TextureManager.registerTexture(model.name);
+
+    // If model provides submeshes (materials), register per-submesh texture keys
+    const subs = (model as any).getSubmeshes ? (model as any).getSubmeshes() : [];
+    if (Array.isArray(subs) && subs.length > 0) {
+      // adjust submesh indices to global offsets and save
+      const mappedSubs: Submesh[] = [];
+        for (const s of subs) {
+        mappedSubs.push({
+          name: s.name,
+          vertStart: vert_start + s.vertStart,
+          vertSize: s.vertSize,
+          indStart: ind_start + s.indStart,
+          indSize: s.indSize,
+        });
+        // register texture key as model@material
+          const texKey = `${model.name}@${s.name}`;
+          // If model discovered an explicit asset key for this material, pass it through
+          const matMap = (model as any).getMaterialAssetMap ? (model as any).getMaterialAssetMap() : {};
+          const assetKey = matMap && matMap[s.name] ? matMap[s.name] : undefined;
+          TextureManager.registerTexture(texKey, assetKey);
+      }
+      this._model_submeshes.set(model.name, mappedSubs);
+    }
 
     this._updateVert();
     this._updateIds();
@@ -242,22 +276,49 @@ export default class ModelManager {
   private static _recreate_ind_buffer() {
     let n_ind = new Array<number>();
     this._loaded_models.forEach((v, k) => {
-  const a = this._indices.slice(v.indStart, v.indStart + v.indSize);
-  const b = Array.from(a);
+      const a = this._indices.slice(v.indStart, v.indStart + v.indSize);
 
       const model_data = this._loaded_models.get(k);
       if (model_data == undefined) throw Error("Error updating buffer");
-      model_data.indexBufferStart = n_ind.length;
 
-      for (let i = 0; i < v.instanceCount; i++) {
-        // append indices for each instance
-        n_ind = n_ind.concat(b);
+      // If model has submeshes, append submesh indices separately so we can draw per-material
+      const subs = this._model_submeshes.get(k);
+      if (subs && subs.length > 0) {
+        // For each submesh, extract indices and repeat per-instance
+        for (const s of subs) {
+          const relStart = s.indStart - v.indStart;
+          const relSize = s.indSize;
+          const slice = a.slice(relStart, relStart + relSize);
+          const sliceArr = Array.from(slice);
+          s.indexBufferStart = n_ind.length;
+          for (let i = 0; i < v.instanceCount; i++) {
+            n_ind = n_ind.concat(sliceArr);
+          }
+          s.indexBufferLength = n_ind.length - (s.indexBufferStart || 0);
+        }
+        // set top-level model_data indexBufferStart/Length spanning all submeshes
+        model_data.indexBufferStart = subs.length > 0 ? subs[0].indexBufferStart || 0 : n_ind.length;
+        model_data.indexBufferLength = subs.reduce((acc, s) => acc + (s.indexBufferLength || 0), 0);
+      } else {
+        // no submeshes: append whole model indices replicated per instance
+        const b = Array.from(a);
+        model_data.indexBufferStart = n_ind.length;
+        for (let i = 0; i < v.instanceCount; i++) {
+          n_ind = n_ind.concat(b);
+        }
+        model_data.indexBufferLength = n_ind.length - model_data.indexBufferStart;
       }
-
-      model_data.indexBufferLength = n_ind.length - model_data.indexBufferStart;
     });
+
     this._instanced_indices = new Uint32Array(n_ind);
     this._setEbo(this._instanced_indices);
+  }
+
+  /**
+   * Return an array of submesh descriptors for a model name (may be empty)
+   */
+  public static getSubmeshes(name: string): Submesh[] {
+    return this._model_submeshes.get(name) || [];
   }
 
   public static getIndicesLength(name: string) {

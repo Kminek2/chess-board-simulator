@@ -7,8 +7,9 @@ const assetsRoot = path.join(projectRoot, "assets", "loaded"); // adjust if need
 const outputFile = path.join(projectRoot, "generated", "assetMap.ts");
 
 // file extensions to include (text-based + images)
+// include .mtl files so material lists are embedded too
 const INCLUDE_RE =
-  /\.(vert|frag|glsl|vs|fs|txt|json|cfg|shader|wgsl|glslfrag|glslvert|obj|png|jpe?g)$/i;
+  /\.(vert|frag|glsl|vs|fs|txt|json|cfg|shader|wgsl|glslfrag|glslvert|obj|mtl|png|jpe?g)$/i;
 
 function walk(dir) {
   let results = [];
