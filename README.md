@@ -17,7 +17,7 @@ Consider this as an early demo for a powerful game engine, that I made from scra
 - OpenGL ES 2.0 powered rendering with expo-gl
 - NON-Interactive chess board simulation
 - React Native and Expo based for cross-platform support. It might work might not. I only have an android to test
-- Optimized for mobile performance (That's actually true. Kind of)
+- Optimized for mobile performance (That's actually true. Kind of. I went so far as to use instancing, and many optimization technics)
 
 ## Installation
 
