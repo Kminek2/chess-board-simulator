@@ -1,7 +1,7 @@
 import Camera from "@/hooks/engine/Camera";
 import DataManager from "@/hooks/engine/DataManager";
 import ModelManager from "@/hooks/engine/ModelManager";
-import Scene from "@/hooks/engine/Scene";
+import Scene, { UI_TESTING } from "@/hooks/engine/Scene";
 import { Shader } from "@/hooks/engine/Shader";
 import TextureManager from "@/hooks/engine/Texture";
 import Time from "@/hooks/engine/Time";
@@ -14,7 +14,7 @@ export default function App() {
   const animationRef = useRef<number | null>(null);
   const [fps, setFps] = useState(0);
   const fpsRef = useRef({ frames: 0, lastTime: Date.now() });
-  let _scene: GameScene | null = null;
+  let [_scene, setScene] = useState<GameScene | null>(null);
 
   async function createProgram(
     gl: ExpoWebGLRenderingContext,
@@ -120,12 +120,12 @@ export default function App() {
       gl.vertexAttribPointer(id_loc, 1, gl.FLOAT, false, 1 * 4, 0);
 
       Time.updateDeltaTime();
-      _scene = new GameScene();
+      setScene(new GameScene());
 
       function render() {
         Time.updateDeltaTime();
 
-        (_scene as GameScene).update();
+        if (_scene) (_scene as GameScene).update();
 
         Scene.EarlyUpdate();
         Scene.Update();
@@ -297,11 +297,19 @@ export default function App() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "black" }}>
-      <GLView style={{ flex: 1 }} onContextCreate={onContextCreate} />
+      {!UI_TESTING ? (
+        <GLView style={{ flex: 1 }} onContextCreate={onContextCreate} />
+      ) : _scene ? null : (
+        (setScene(new GameScene()) as unknown as null)
+      )}
       <View style={styles.fpsContainer} pointerEvents="none">
         <Text style={styles.fpsText}>{fps} FPS</Text>
       </View>
-      {_scene ? _scene && (_scene as GameScene).render() : null}
+      {_scene ? (
+        _scene && (_scene as GameScene).render()
+      ) : (
+        <Text>Loading…</Text>
+      )}
     </View>
   );
 }

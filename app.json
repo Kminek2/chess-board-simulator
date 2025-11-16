@@ -1,14 +1,12 @@
 {
   "expo": {
-    "assetBundlePatterns": [
-      "Assets/shaders/*"
-    ],
-    "name": "shopifast",
-    "slug": "shopifast",
+    "assetBundlePatterns": ["Assets/shaders/*"],
+    "name": "chessGames",
+    "slug": "chessGames",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "landscape",
     "icon": "./assets/images/icon.png",
-    "scheme": "shopifast",
+    "scheme": "chessgames",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

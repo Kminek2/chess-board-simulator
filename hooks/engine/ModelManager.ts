@@ -1,8 +1,8 @@
+import { assetContents } from "@/generated/assetMap";
+import Logger from "@/hooks/helpers/logger";
 import { ExpoWebGLRenderingContext } from "expo-gl";
 import Model from "./Model";
-import { assetContents } from "@/generated/assetMap";
 import TextureManager from "./Texture";
-import Logger from "@/hooks/helpers/logger";
 
 type LoadedModel = {
   vertStart: number; // vertex_data_start
@@ -80,7 +80,10 @@ export default class ModelManager {
     } catch (err) {
       console.warn("ModelManager: failed to preload models:", err);
     }
-  Logger.info("ModelManager: loaded models:", Array.from(this._loaded_models.keys()));
+    Logger.info(
+      "ModelManager: loaded models:",
+      Array.from(this._loaded_models.keys())
+    );
   }
 
   // Expose buffers so rendering code can bind them before setting attrib pointers
@@ -140,15 +143,17 @@ export default class ModelManager {
       indexBufferLength: 0,
     });
 
-  // Register texture for this model (texture file name = model name)
-  TextureManager.registerTexture(model.name);
+    // Register texture for this model (texture file name = model name)
+    TextureManager.registerTexture(model.name);
 
     // If model provides submeshes (materials), register per-submesh texture keys
-    const subs = (model as any).getSubmeshes ? (model as any).getSubmeshes() : [];
+    const subs = (model as any).getSubmeshes
+      ? (model as any).getSubmeshes()
+      : [];
     if (Array.isArray(subs) && subs.length > 0) {
       // adjust submesh indices to global offsets and save
       const mappedSubs: Submesh[] = [];
-        for (const s of subs) {
+      for (const s of subs) {
         mappedSubs.push({
           name: s.name,
           vertStart: vert_start + s.vertStart,
@@ -157,11 +162,13 @@ export default class ModelManager {
           indSize: s.indSize,
         });
         // register texture key as model@material
-          const texKey = `${model.name}@${s.name}`;
-          // If model discovered an explicit asset key for this material, pass it through
-          const matMap = (model as any).getMaterialAssetMap ? (model as any).getMaterialAssetMap() : {};
-          const assetKey = matMap && matMap[s.name] ? matMap[s.name] : undefined;
-          TextureManager.registerTexture(texKey, assetKey);
+        const texKey = `${model.name}@${s.name}`;
+        // If model discovered an explicit asset key for this material, pass it through
+        const matMap = (model as any).getMaterialAssetMap
+          ? (model as any).getMaterialAssetMap()
+          : {};
+        const assetKey = matMap && matMap[s.name] ? matMap[s.name] : undefined;
+        TextureManager.registerTexture(texKey, assetKey);
       }
       this._model_submeshes.set(model.name, mappedSubs);
     }
@@ -170,8 +177,8 @@ export default class ModelManager {
     this._updateIds();
     this._recreate_ind_buffer();
 
-  // Debug logs removed to avoid spamming Metro logs during render.
-  // If you need to inspect buffers, enable these selectively.
+    // Debug logs removed to avoid spamming Metro logs during render.
+    // If you need to inspect buffers, enable these selectively.
   }
 
   private static _updateIds() {
@@ -210,11 +217,15 @@ export default class ModelManager {
       this._recreateVao(vertices.length);
     }
 
-  this._gl.bindBuffer(this._gl.ARRAY_BUFFER, this._vbo);
-  this._gl.bufferSubData(this._gl.ARRAY_BUFFER, this._vbo_used * 4, vertices);
+    this._gl.bindBuffer(this._gl.ARRAY_BUFFER, this._vbo);
+    this._gl.bufferSubData(this._gl.ARRAY_BUFFER, this._vbo_used * 4, vertices);
 
-  this._vbo_used += vertices.length;
-  Logger.debug("ModelManager._addToVertex: uploaded", vertices.length, "floats");
+    this._vbo_used += vertices.length;
+    Logger.debug(
+      "ModelManager._addToVertex: uploaded",
+      vertices.length,
+      "floats"
+    );
   }
 
   private static _recreateVao(extra_size: number) {
@@ -297,8 +308,12 @@ export default class ModelManager {
           s.indexBufferLength = n_ind.length - (s.indexBufferStart || 0);
         }
         // set top-level model_data indexBufferStart/Length spanning all submeshes
-        model_data.indexBufferStart = subs.length > 0 ? subs[0].indexBufferStart || 0 : n_ind.length;
-        model_data.indexBufferLength = subs.reduce((acc, s) => acc + (s.indexBufferLength || 0), 0);
+        model_data.indexBufferStart =
+          subs.length > 0 ? subs[0].indexBufferStart || 0 : n_ind.length;
+        model_data.indexBufferLength = subs.reduce(
+          (acc, s) => acc + (s.indexBufferLength || 0),
+          0
+        );
       } else {
         // no submeshes: append whole model indices replicated per instance
         const b = Array.from(a);
@@ -306,7 +321,8 @@ export default class ModelManager {
         for (let i = 0; i < v.instanceCount; i++) {
           n_ind = n_ind.concat(b);
         }
-        model_data.indexBufferLength = n_ind.length - model_data.indexBufferStart;
+        model_data.indexBufferLength =
+          n_ind.length - model_data.indexBufferStart;
       }
     });
 
@@ -344,24 +360,34 @@ export default class ModelManager {
   public static addInstanceByName(name: string, count: number = 1) {
     const model_data = this._loaded_models.get(name);
     if (model_data == undefined) throw Error(`Model ${name} not registered`);
-    Logger.debug(`ModelManager.addInstanceByName: before=${model_data.instanceCount}, add=${count}`);
+    Logger.debug(
+      `ModelManager.addInstanceByName: before=${model_data.instanceCount}, add=${count}`
+    );
     model_data.instanceCount += count;
     this._updateIds();
     this._recreate_ind_buffer();
-    Logger.debug(`ModelManager.addInstanceByName: after=${model_data.instanceCount}`);
+    Logger.debug(
+      `ModelManager.addInstanceByName: after=${model_data.instanceCount}`
+    );
   }
-
 
   public static deleteInstanceByName(name: string, count: number = 1) {
     const model_data = this._loaded_models.get(name);
     if (model_data == undefined) throw Error(`Model ${name} not registered`);
     if (model_data.instanceCount < count) {
-      throw Error(`ModelManager.deleteInstanceByName: cannot delete ${count} instances from model ${name} with only ${model_data.instanceCount} instances`);
+      Logger.warn(
+        `ModelManager.deleteInstanceByName: cannot delete ${count} instances from model ${name} with only ${model_data.instanceCount} instances`
+      );
+      count = model_data.instanceCount;
     }
-    Logger.debug(`ModelManager.deleteInstanceByName: before=${model_data.instanceCount}, delete=${count}`);
+    Logger.debug(
+      `ModelManager.deleteInstanceByName: before=${model_data.instanceCount}, delete=${count}`
+    );
     model_data.instanceCount -= count;
     this._updateIds();
     this._recreate_ind_buffer();
-    Logger.debug(`ModelManager.deleteInstanceByName: after=${model_data.instanceCount}`);
+    Logger.debug(
+      `ModelManager.deleteInstanceByName: after=${model_data.instanceCount}`
+    );
   }
 }

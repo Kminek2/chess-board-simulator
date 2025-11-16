@@ -5,7 +5,9 @@ export default class Transform {
   private _rot: Vector3;
   private _scale: Vector3;
 
-  private _front: Vector3 = new Vector3();
+  private _front: Vector3 = new Vector3(0, 0, -1);
+  private _up: Vector3 = new Vector3(0, 1, 0);
+  private _right: Vector3 = new Vector3(1, 0, 0);
 
   private _updates: boolean = true;
   private _mat: Matrix4 = new Matrix4();
@@ -42,11 +44,15 @@ export default class Transform {
 
   //thanks to https://learnopengl.com/Getting-started/Camera
   private _update_front() {
-    this._front = new Vector3();
-    this._front.x = Math.cos(this._rot.y) * Math.cos(this._rot.x);
-    this._front.y = Math.sin(this._rot.x);
-    this._front.z = Math.sin(this._rot.y) * Math.cos(this._rot.x);
-    this._front.normalize();
+    this._front = new Vector3(
+      Math.cos(this._rot.y) * Math.cos(this._rot.x),
+      Math.sin(this._rot.x),
+      Math.sin(this._rot.y) * Math.cos(this._rot.x)
+    ).normalize();
+
+    // also re-calculate the Right and Up vector
+    this._right = this.front.cross(new Vector3(0, 1, 0)).normalize();
+    this._up = this.right.cross(this.front).normalize();
   }
 
   public get pos() {
@@ -60,13 +66,16 @@ export default class Transform {
 
   public translate(by: Vector3) {
     // Update internal position directly (avoid using the public getter which returns a copy)
-    this._pos = this._pos.add(by.multiply(this._front));
+    this._pos = this._pos
+      .add(this.right.scale(by.x))
+      .add(this.up.scale(by.y))
+      .add(this.front.scale(by.z));
     this._updates = true;
   }
 
   public move(by: Vector3) {
     // Move by world-space vector
-    this._pos = this._pos.add(by);
+    this._pos = this.pos.add(by);
     this._updates = true;
   }
 
@@ -117,5 +126,17 @@ export default class Transform {
   public set scale(new_scale: Vector3) {
     this._scale = new_scale;
     this._updates = true;
+  }
+
+  public get front() {
+    return new Vector3(this._front);
+  }
+
+  public get up() {
+    return new Vector3(this._up);
+  }
+
+  public get right() {
+    return new Vector3(this._right);
   }
 }
