@@ -10,7 +10,9 @@ A React Native app built with Expo and expo-gl that renders a chess board using 
 
 Yea. It was supposed to be a game but I just run out of time because react-native has stupidly low official openGL support and I was busy with other important stuff.
 
-Consider this as an early demo for a powerful game engine, that I made from scratch for fun
+Consider this as an early demo for a powerful game engine, that I made from scratch for fun.
+
+This project was created as an apprenticeship project that I had about 2 weeks for (I don't remember exactly how much).
 
 ## Features
 
