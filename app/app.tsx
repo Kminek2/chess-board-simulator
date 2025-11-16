@@ -8,6 +8,7 @@ import Time from "@/hooks/engine/Time";
 import { ExpoWebGLRenderingContext, GLView } from "expo-gl";
 import React, { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import Loading from "./(tabs)/Loading";
 import GameScene from "./GameScene";
 
 export default function App() {
@@ -15,6 +16,8 @@ export default function App() {
   const [fps, setFps] = useState(0);
   const fpsRef = useRef({ frames: 0, lastTime: Date.now() });
   let [_scene, setScene] = useState<GameScene | null>(null);
+  const [_loaded, setLoaded] = useState<boolean>(false);
+  const [_loadingText, setLoadingText] = useState<string>("Initializing");
 
   async function createProgram(
     gl: ExpoWebGLRenderingContext,
@@ -55,6 +58,10 @@ export default function App() {
           "OES_element_index_uint not supported. Please use a compatible (more powerful) device."
         );
       }
+
+      setLoadingText("Compiling shaders");
+      await new Promise((r) => setTimeout(r, 0));
+
       const vertex_shader = new Shader(gl, "test", gl.VERTEX_SHADER);
       const fragment_shader = new Shader(gl, "test", gl.FRAGMENT_SHADER);
 
@@ -72,20 +79,36 @@ export default function App() {
       gl.enable(gl.CULL_FACE);
       gl.cullFace(gl.BACK);
 
+      setLoadingText("Loading models");
+      await new Promise((r) => setTimeout(r, 0));
+
       console.log("App: about to ModelManager.init");
       ModelManager.init(gl);
       console.log("App: done ModelManager.init");
+
+      setLoadingText("Loading textures");
+      await new Promise((r) => setTimeout(r, 0));
+
       console.log("App: about to TextureManager.init");
       await TextureManager.init(gl);
       console.log("App: done TextureManager.init");
+
+      setLoadingText("Loading Object data");
+      await new Promise((r) => setTimeout(r, 0));
+
       console.log("App: about to DataManager.init");
       DataManager.init(gl);
       console.log("App: done DataManager.init");
 
+      setLoadingText("Setting shader data");
+      await new Promise((r) => setTimeout(r, 0));
       // Bind attributes (interleaved vertex: x,y,z,u,v) -> stride = 5 * 4
       const position_loc = gl.getAttribLocation(program, "a_position");
       const texcoord_loc = gl.getAttribLocation(program, "a_texcoord");
       const id_loc = gl.getAttribLocation(program, "a_instanceID");
+
+      setLoadingText("Placing camera");
+      await new Promise((r) => setTimeout(r, 0));
 
       // Cache uniform locations for camera matrices
       const u_view_loc = gl.getUniformLocation(program, "u_view");
@@ -103,6 +126,9 @@ export default function App() {
       gl.enableVertexAttribArray(texcoord_loc);
       gl.enableVertexAttribArray(id_loc);
 
+      setLoadingText("Sending data to GPU");
+      await new Promise((r) => setTimeout(r, 0));
+
       // Default binding to start of vertex buffer; per-model we will rebind with offsets
       gl.bindBuffer(gl.ARRAY_BUFFER, ModelManager.getVBO());
       gl.vertexAttribPointer(position_loc, 3, gl.FLOAT, false, VERT_STRIDE, 0);
@@ -118,6 +144,9 @@ export default function App() {
       // ID attribute uses separate buffer (VBOIDs)
       gl.bindBuffer(gl.ARRAY_BUFFER, ModelManager.getVBOIDs());
       gl.vertexAttribPointer(id_loc, 1, gl.FLOAT, false, 1 * 4, 0);
+
+      setLoadingText("Starting main loop");
+      await new Promise((r) => setTimeout(r, 0));
 
       Time.updateDeltaTime();
       setScene(new GameScene());
@@ -269,6 +298,8 @@ export default function App() {
       }
 
       render();
+      setLoadingText("Loaded");
+      setLoaded(true);
     } catch (err) {
       console.error(err);
     }
@@ -302,14 +333,13 @@ export default function App() {
       ) : _scene ? null : (
         (setScene(new GameScene()) as unknown as null)
       )}
+
+      {UI_TESTING && !_loaded ? (setLoaded(true) as unknown as null) : null}
       <View style={styles.fpsContainer} pointerEvents="none">
         <Text style={styles.fpsText}>{fps} FPS</Text>
       </View>
-      {_scene ? (
-        _scene && (_scene as GameScene).render()
-      ) : (
-        <Text>Loading…</Text>
-      )}
+      {_scene ? _scene && (_scene as GameScene).render() : null}
+      {!_loaded && <Loading loadingText={_loadingText} />}
     </View>
   );
 }
