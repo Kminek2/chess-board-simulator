@@ -1,20 +1,24 @@
 import Camera from "@/hooks/engine/Camera";
 import DataManager from "@/hooks/engine/DataManager";
+import GameObj from "@/hooks/engine/GameObj";
+import Model from "@/hooks/engine/Model";
 import ModelManager from "@/hooks/engine/ModelManager";
 import Scene from "@/hooks/engine/Scene";
 import { Shader } from "@/hooks/engine/Shader";
 import TextureManager from "@/hooks/engine/Texture";
 import Time from "@/hooks/engine/Time";
+import Transform from "@/hooks/engine/Transform";
+import DefaultScene from "@/hooks/game/DefaultScene";
+import Logger from "@/hooks/helpers/logger";
 import { ExpoWebGLRenderingContext, GLView } from "expo-gl";
+import { Vector3 } from "math.gl";
 import React, { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import GameScene from "./GameScene";
 
 export default function App() {
   const animationRef = useRef<number | null>(null);
   const [fps, setFps] = useState(0);
   const fpsRef = useRef({ frames: 0, lastTime: Date.now() });
-  let _scene: GameScene | null = null;
 
   async function createProgram(
     gl: ExpoWebGLRenderingContext,
@@ -119,13 +123,12 @@ export default function App() {
       gl.bindBuffer(gl.ARRAY_BUFFER, ModelManager.getVBOIDs());
       gl.vertexAttribPointer(id_loc, 1, gl.FLOAT, false, 1 * 4, 0);
 
+      Scene.active_scene = new DefaultScene();
+
       Time.updateDeltaTime();
-      _scene = new GameScene();
 
       function render() {
         Time.updateDeltaTime();
-
-        (_scene as GameScene).update();
 
         Scene.EarlyUpdate();
         Scene.Update();
@@ -230,15 +233,12 @@ export default function App() {
           if (subs && subs.length > 0) {
             for (const s of subs) {
               const texKey = `${k}@${s.name}`;
-              const meta =
-                (TextureManager as any).getMeta(texKey) ||
-                (TextureManager as any).getMeta(k);
+              const meta = (TextureManager as any).getMeta(texKey) || (TextureManager as any).getMeta(k);
               if (u_texOffset) gl.uniform2f(u_texOffset, meta.x, meta.y);
               if (u_texSize) gl.uniform2f(u_texSize, meta.width, meta.height);
-              if (u_atlasSize)
-                gl.uniform2f(u_atlasSize, atlasSize.width, atlasSize.height);
+              if (u_atlasSize) gl.uniform2f(u_atlasSize, atlasSize.width, atlasSize.height);
 
-              const count = s.indexBufferLength || 0;
+              const count = (s.indexBufferLength || 0);
               // s.indexBufferStart already points to the correct byte offset (in elements) within the shared EBO
               // multiply by 4 to convert to bytes. Do NOT add model_data.indexBufferStart again (would double-offset).
               const offset = (s.indexBufferStart || 0) * 4;
@@ -251,13 +251,11 @@ export default function App() {
             const meta = (TextureManager as any).getMeta(k);
             if (u_texOffset) gl.uniform2f(u_texOffset, meta.x, meta.y);
             if (u_texSize) gl.uniform2f(u_texSize, meta.width, meta.height);
-            if (u_atlasSize)
-              gl.uniform2f(u_atlasSize, atlasSize.width, atlasSize.height);
+            if (u_atlasSize) gl.uniform2f(u_atlasSize, atlasSize.width, atlasSize.height);
 
             gl.drawElements(
               gl.TRIANGLES,
-              ModelManager.getIndicesLength(k) *
-                ModelManager.getInstanceCount(k),
+              ModelManager.getIndicesLength(k) * ModelManager.getInstanceCount(k),
               gl.UNSIGNED_INT,
               ModelManager.getInstanceOffset(k) * 4
             );
@@ -301,7 +299,6 @@ export default function App() {
       <View style={styles.fpsContainer} pointerEvents="none">
         <Text style={styles.fpsText}>{fps} FPS</Text>
       </View>
-      {_scene ? _scene && (_scene as GameScene).render() : null}
     </View>
   );
 }
